@@ -7,6 +7,25 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.44.3
+
+**Lines pushed off a marked stretch came out as a pile.** Mark the intro as
+holding no words and the lines the aligner dropped there are moved out — but
+they were moved into whatever room the aligner happened to leave, however
+little that was. Four lines against a hole with the next line pressing right
+behind it got a tenth of a second apiece: not a tight line, which is what was
+intended, but the very pile this module exists to undo. On the timeline they
+sit on top of one another; in the video they flash past unread.
+
+The floor was already worked out — the least those syllables can honestly be
+sung in — and then never used. It is used now, and the room for it is borrowed
+from the lines that follow, gap by gap, only as far as their own silences can
+spare and never across another mark or a line left to the original. In the
+case above the lines went from a tenth of a second to six tenths. The floor
+also counts the breath between one line and the next, which it did not: a run
+given exactly the minimum still came out under it by a twentieth of a second
+a line.
+
 ## 4.44.2
 
 **macOS was asked the wrong question about its own folders.** The search knew

@@ -1843,6 +1843,35 @@ def main():
     check("and the cramp is said out loud",
           any("ВНИМАНИЕ" in m or "NOTE" in m for m in said_e), said_e[-1:])
 
+    # …but “cramped” must still mean a line somebody can read. Four lines
+    # dropped in a marked intro with the next one pressing right against it
+    # used to come out at a tenth of a second apiece — not a tight line, the
+    # very pile the module refuses to leave standing anywhere else. The floor
+    # is the module's own: the least these syllables can honestly be sung in.
+    pile = L.parse("первая строка этой песни\nвторая строка этой песни\n"
+                   "третья строка этой песни\nчетвёртая строка этой песни\n"
+                   "пятая строка звучит потом")
+    for ln, (a, b) in zip(pile.lines, [(2.0, 5.0), (5.0, 8.0), (8.0, 11.0),
+                                       (11.0, 14.0), (20.6, 24.6)]):
+        A._spread(ln.words, a, b)
+        ln.start, ln.end = a, b
+    A.enforce_marks(pile, [(0.0, 20.0)], 60.0, log=lambda m: None)
+    short = [(k + 1, round(ln.end - ln.start, 2))
+             for k, ln in enumerate(pile.lines)
+             # a hundredth of slack: the floor is a design minimum shared out
+             # by syllable count, not a bit-exact bound
+             if ln.end - ln.start < A._MIN_PER_SYLLABLE * A._syl(ln) - 0.01]
+    check("a run with no room is still given time its syllables can be sung in",
+          not short, short)
+    clash = [(k + 1, round(pile.lines[k - 1].end - ln.start, 2))
+             for k, ln in enumerate(pile.lines)
+             if k and ln.start < pile.lines[k - 1].end - 1e-6]
+    check("and no line of it lands on top of the one before",
+          not clash, clash)
+    check("nothing was pushed onto the marked stretch to do it",
+          all(ln.start >= 19.95 for ln in pile.lines),
+          [round(ln.start, 2) for ln in pile.lines])
+
     roomy = _three(26.0)                  # singing after the hole has room
     said_r = []
     A.enforce_marks(roomy, hole_m, 30.0, log=said_r.append)

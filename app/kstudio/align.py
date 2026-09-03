@@ -1166,6 +1166,55 @@ def clip_to_marks(lyrics: Lyrics, skip: List[tuple], log: Log = _noop) -> int:
     return fixed
 
 
+def _room_after(lines, k: int, want: float, gap: float = 0.05) -> float:
+    """How much time the lines from `k` on can give up, without moving one
+    that must not move.
+
+    Each line can yield the silence in front of the one after it, less the
+    breath they need between them. A line the singer marked as the original's
+    own is anchored to a voice on the record and is never pushed.
+    """
+    have = 0.0
+    for idx in range(k, len(lines)):
+        ln = lines[idx]
+        if ln.start is None or ln.end is None or not ln.words or ln.keep:
+            break
+        nxt = lines[idx + 1] if idx + 1 < len(lines) else None
+        if nxt is None or nxt.start is None:
+            return want                    # nothing after: all the room there is
+        if nxt.keep:
+            have += max(nxt.start - ln.end - gap, 0.0)
+            break
+        have += max(nxt.start - ln.end - gap, 0.0)
+        if have >= want:
+            break
+    return min(have, want)
+
+
+def _absorb(lines, k: int, delta: float, gap: float = 0.05) -> None:
+    """Push the lines from `k` on later by `delta`, letting the gaps eat it.
+
+    The first line moves the whole way; the next only as far as the silence
+    before it failed to cover, and by the third or fourth there is usually
+    nothing left to pass on.
+    """
+    left = delta
+    idx = k
+    while idx < len(lines) and left > 1e-3:
+        ln = lines[idx]
+        if ln.start is None or ln.end is None or not ln.words or ln.keep:
+            break
+        for w in ln.words:
+            w.start += left
+            w.end += left
+        ln.start, ln.end = ln.words[0].start, ln.words[-1].end
+        nxt = lines[idx + 1] if idx + 1 < len(lines) else None
+        if nxt is None or nxt.start is None:
+            break
+        left = max(gap - (nxt.start - ln.end), 0.0)
+        idx += 1
+
+
 def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> int:
     """No words on a marked stretch — as a guarantee, not an intention.
 
@@ -1191,7 +1240,7 @@ def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> in
                 return (a, b)
         return None
 
-    moved, cramped = 0, []
+    moved, cramped, borrowed = 0, [], []
     i = 0
     while i < len(lines):
         h = hit(lines[i])
@@ -1211,7 +1260,11 @@ def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> in
         nxt = lines[j + 1].start if j + 1 < len(lines) and \
             lines[j + 1].start is not None else duration
         total = sum(_syl(ln) for ln in run) or 1
-        need = total * _MIN_PER_SYLLABLE
+        # The least this run can honestly take: every syllable at its shortest,
+        # plus the breath left between one line and the next. The breath used
+        # to be left out, so a run given exactly `need` still came out under
+        # the floor by a twentieth of a second a line.
+        need = total * _MIN_PER_SYLLABLE + 0.05 * len(run)
         # singing between the neighbours, holes taken out; nearest the following
         # line with room to breathe, else simply the widest there is
         wins = _voiced_windows(min(prv, lo_h), max(nxt, hi_h),
@@ -1226,9 +1279,31 @@ def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> in
             pick = max(wins, key=lambda w: w[1] - w[0])
         if not pick or pick[1] - pick[0] < 0.2:
             # no singing anywhere between the neighbours: right against the
-            # hole then, cramped, and said out loud
-            pick = [hi_h, hi_h + max(0.3, 0.12 * sum(len(ln.words) for ln in run))]
+            # hole then, and said out loud
+            pick = [hi_h, hi_h + max(need, 0.3)]
             cramped.append((i, j, hi_h))
+        pick = [pick[0], pick[1]]
+        # However that window was chosen, it may be far too small for the words
+        # that have to stand in it — and this is where a run came out at a tenth
+        # of a second a line, which is not a tight line but the very pile this
+        # module exists to undo. The honest floor was worked out above and then
+        # never used: `need`, the least these syllables can be sung in. The room
+        # for it is borrowed from the lines that follow — only as much as their
+        # own silences can spare, and never across another mark.
+        if pick[1] - pick[0] < need - 1e-6:
+            after = [a for a, _ in marks if a >= pick[1] - 1e-6]
+            wall = min(after) if after else duration
+            over = min(need - (pick[1] - pick[0]), max(wall - pick[1], 0.0))
+            if over > 1e-3:
+                if j + 1 >= len(lines):
+                    pick[1] += over          # nothing follows: take it all
+                    borrowed.append((i, j, over))
+                else:
+                    got = _room_after(lines, j + 1, over)
+                    if got > 1e-3:
+                        _absorb(lines, j + 1, got)
+                        pick[1] += got
+                        borrowed.append((i, j, got))
         span = min(pick[1] - pick[0], max(_SUNG_PER_SYLLABLE * total, need))
         base = (pick[1] - span) if j + 1 < len(lines) else pick[0]
         acc = 0.0
@@ -1243,6 +1318,11 @@ def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> in
     if moved:
         log(tr(f"  lines forced off the marked stretches: {moved}",
                f"  строк принудительно убрано с отмеченных пустот: {moved}"))
+    for a, b, got in borrowed:
+        log(tr(f"  lines {a + 1}–{b + 1} had less room than their syllables can be "
+               f"sung in; {got:.1f} s was borrowed from what follows",
+               f"  строкам {a + 1}–{b + 1} досталось меньше места, чем их слоги "
+               f"можно спеть; {got:.1f} с занято у следующих"))
     for a, b, at in cramped:
         log(tr(f"  NOTE: lines {a + 1}–{b + 1} had nowhere to go and are squeezed in "
                f"right after the mark at {mmss(at)} — cramped on purpose: better a "
