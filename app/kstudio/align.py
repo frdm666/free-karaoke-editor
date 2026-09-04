@@ -1497,7 +1497,8 @@ def _fill_lines(lyrics: Lyrics, duration: float, min_word: float = 0.12) -> None
 def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
                    model_name: str = "medium", language: str = "ru",
                    device: Optional[str] = None, log: Log = _noop,
-                   isolated: bool = False, skip=None) -> Lyrics:
+                   isolated: bool = False, skip=None,
+                   prefer: str = "auto") -> Lyrics:
     """Align a song whose text carries a few times of its own.
 
     “[2:27] Remember this day” in the lyrics file says: this line is sung about
@@ -1508,11 +1509,16 @@ def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
 
     A line with no peg is timed as always, inside the stretch it belongs to.
     """
-    try:
-        import stable_whisper
-        have_whisper = True
-    except ImportError:
+    # “energy” asked for outright means the loudness engine, pegs or no pegs:
+    # somebody who chose it does not want a model loaded behind their back.
+    if prefer == "energy":
         have_whisper = False
+    else:
+        try:
+            import stable_whisper
+            have_whisper = True
+        except ImportError:
+            have_whisper = False
 
     pegs = []
     for i, ln in enumerate(lyrics.lines):
@@ -1596,18 +1602,26 @@ def align(lyrics: Lyrics, audio_path: str, duration: float, engine: str = "auto"
             "В тексте уже есть тайминги [мм:сс.дд] — выравнивание пропускаю."))
         _spread_manual(lyrics, duration)
         return lyrics, "manual"
-    if lyrics.has_manual_times and engine in ("auto", "whisper"):
+    if lyrics.has_manual_times and engine != "none":
         # Some lines carry a time and some do not: those are pegs, not a
         # timing. align_anchored copes without stable-ts too — each stretch is
         # laid out by loudness, still inside its own pegs — so the import must
-        # not stand between the pegs and their meaning.
-        try:
-            import stable_whisper  # noqa: F401
-            label = "whisper"
-        except ImportError:
+        # not stand between the pegs and their meaning. Nor may the engine:
+        # this used to run only for “auto” and “whisper”, and the window asks
+        # for “energy” by name on any machine without stable-ts installed — so
+        # the people who most needed their pegs were the ones whose pegs were
+        # quietly dropped.
+        if engine == "energy":
             label = "energy"
+        else:
+            try:
+                import stable_whisper  # noqa: F401
+                label = "whisper"
+            except ImportError:
+                label = "energy"
         return align_anchored(lyrics, audio_path, duration, model_name, language,
-                              device, log, isolated=isolated, skip=skip), label
+                              device, log, isolated=isolated, skip=skip,
+                              prefer=engine), label
 
     if engine in ("auto", "whisper"):
         try:

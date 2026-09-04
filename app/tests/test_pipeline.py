@@ -1172,6 +1172,24 @@ def main():
         else:
             sys.modules.pop("stable_whisper", None)
 
+    # …and the window asks for the loudness engine BY NAME on every machine
+    # without stable-ts. That was the one word the pegs did not survive: the
+    # branch ran for “auto” and “whisper” only, so the people who most needed
+    # their pegs were exactly the ones whose pegs were quietly dropped.
+    pegged3 = L.parse("[0:02] раз строка тут\nдва строка тут\n"
+                      "[0:16] три строка тут\nчетыре строка тут")
+    said3 = []
+    got3, engine3 = A.align(pegged3, song, 26.0, engine="energy",
+                            log=said3.append)
+    check("the loudness engine asked for by name still honours the pegs",
+          any("собственных времён" in m or "times of its own" in m for m in said3),
+          said3[:2])
+    check("and it is still the loudness engine that ran", engine3 == "energy",
+          engine3)
+    check("the late lines start after their own peg",
+          all(ln.start >= 15.5 for ln in got3.lines[2:]),
+          [round(ln.start, 1) for ln in got3.lines])
+
     # A peg written out of order is refused with a word, not obeyed.
     disorder = L.parse("[0:16] раз строка тут\n[0:04] два строка тут\nтри строка тут")
     said_d = []

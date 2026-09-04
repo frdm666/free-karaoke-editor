@@ -7,6 +7,23 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.44.4
+
+**Locked lines were ignored by the very people who needed them.** Lock a line
+and press “Re-time” and it becomes a peg: the aligner is only ever shown the
+audio between two pegs, so the text around it cannot wander off across the
+song. That branch ran for the “auto” and “whisper” engines — and the window
+asks for “energy” by name on every machine without stable-ts installed. So on
+exactly those machines, where the timing needs the most help, every peg was
+dropped without a word.
+
+The comment above the branch said the opposite in so many words: that the
+anchored pass copes without stable-ts, each stretch laid out by loudness but
+still inside its own pegs, and that the import must not stand between the pegs
+and their meaning. The engine was doing what the import was forbidden to.
+Pegs are honoured for the loudness engine now, and asking for it by name no
+longer loads a model behind the singer's back.
+
 ## 4.44.3
 
 **Lines pushed off a marked stretch came out as a pile.** Mark the intro as
