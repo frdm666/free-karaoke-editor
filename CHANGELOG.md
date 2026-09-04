@@ -7,6 +7,16 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.47.1
+
+**A bare “[3:10-3:50]” went back to meaning what it always meant.** On a line
+of its own it says there are no words in that stretch of the song — the older,
+shorter form of the mark. Giving lines a range of their own the day before
+made a bracket with two times in it look like a placed line, so a mark
+standing alone was read as a line with both ends and no words, and quietly
+dropped. A bracket is a placed line only when words follow it; alone, it is a
+mark, as it was.
+
 ## 4.47.0
 
 **A grid of beats over the timeline, the way a sequencer has one.** Bars of

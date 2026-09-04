@@ -307,6 +307,12 @@ def parse(raw: str) -> Lyrics:
                     finish = None
             line = m.group(5).strip()
             if not line:
+                # “[3:10-3:50]” standing alone is not a line with both its ends
+                # and no words — it is the older, shorter way of saying there
+                # are no words in that stretch at all, and it goes on meaning
+                # that. Only a bracket with words after it is a placed line.
+                if finish is not None:
+                    lyr.skips.append((start, finish))
                 continue
 
         backing = False

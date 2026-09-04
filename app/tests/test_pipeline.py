@@ -1216,6 +1216,19 @@ def main():
           [(ln.start, ln.text[:12]) for ln in loose.lines])
     check("and the line above keeps the end it should have",
           abs(loose.lines[0].end - 9.27) < 1e-9, loose.lines[0].end)
+    # A bare “[3:10-3:50]” on a line of its own says there are no words in that
+    # stretch — the older, shorter form, and it looks exactly like a line given
+    # both its ends and no words at all. Adding the range syntax swallowed it;
+    # a bracket is a placed line only when words follow it.
+    mixed = L.parse("раз строка тут\n[3:10-3:50]\n[нет текста 1:02-1:40]\n"
+                    "[0:05-0:09.27] два строка тут\n[Соло 0:30-0:44]")
+    check("a bare range still means there are no words there",
+          sorted(mixed.skips) == [(30.0, 44.0), (62.0, 100.0), (190.0, 230.0)],
+          sorted(mixed.skips))
+    check("while a range with words after it is a placed line",
+          len(mixed.lines) == 2 and mixed.lines[1].held
+          and abs(mixed.lines[1].end - 9.27) < 1e-9,
+          [(ln.text[:14], ln.start, ln.end) for ln in mixed.lines])
     said_b = []
     got_b, _ = A.align(both, song, 26.0, engine="energy", log=said_b.append)
     check("the placed line is where it was written, to the hundredth",
