@@ -893,13 +893,42 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
         for one in bgs:
             stamp_name(one)
 
-    def furniture(d, prog):
+    # The beat, when the song keeps one and the singer asked to see it. Four
+    # dots in the bottom corner, one to a beat of the bar: enough to come in on
+    # without anything standing between a person and the words. It is drawn
+    # from the tempo they typed, so it is exactly as right as that number is.
+    beat_at = payload.get("grid") or None
+    beat_len = (60.0 / max(20.0, min(300.0, float(beat_at.get("bpm") or 120)))
+                if beat_at else 0.0)
+    beat_zero = float(beat_at.get("beat0") or 0.0) if beat_at else 0.0
+
+    def furniture(d, prog, at=None):
         """The bar along the bottom: on every frame, the opening included."""
         bar_y, bar_h = int(H * 0.955), max(int(H * 0.004), 2)
         d.rectangle([margin, bar_y, W - margin, bar_y + bar_h], fill=(40, 45, 68))
         if prog > 0:
             d.rectangle([margin, bar_y, margin + (W - 2 * margin) * prog,
                          bar_y + bar_h], fill=COL_BAR)
+        if beat_len <= 0 or at is None:
+            return
+        # Which beat of the bar, and how long ago it struck: the dot flashes
+        # and falls back, rather than staying lit for the whole beat, so the
+        # eye reads a pulse and not a row of lamps.
+        n = int(math.floor((at - beat_zero) / beat_len))
+        since = (at - beat_zero) - n * beat_len
+        fade = max(0.0, 1.0 - since / max(min(beat_len * 0.55, 0.20), 1e-6))
+        r = max(2, int(round(H * 0.0055)))
+        gap = max(3 * r, int(H * 0.024))
+        y0 = bar_y - int(H * 0.030)
+        x0 = W - margin - gap * 3
+        for i in range(4):
+            lit = (n % 4) == i
+            hue = COL_HOT if i == 0 else COL_BAR
+            k = fade if lit else 0.0
+            col = _mix(COL_PIP, hue, k)
+            rr = r + (1 if lit and i == 0 else 0)
+            cx = x0 + gap * i
+            d.ellipse([cx - rr, y0 - rr, cx + rr, y0 + rr], fill=col)
 
     # The opening: the name held large, then three, two, one. The music is
     # delayed by exactly as long, so nobody is caught mid-breath.
@@ -999,7 +1028,10 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             first = next_sung(lines, -1)
             if first < len(lines):
                 draw_queue(frame, first)
-        furniture(d, 0.0)
+        # The opening counts in the same beat the song will keep: the intro
+        # runs before second zero, so its time is negative here and the beats
+        # walk backwards into the song.
+        furniture(d, 0.0, at=tt - lead)
         return frame
 
     def song_frame(t):
@@ -1209,7 +1241,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                             fill=_mix(BG_TOP, (255, 255, 255), 0.18))
                 d.rectangle([bx, by, bx + int(bw * done_k), by + bh], fill=COL_HOT)
 
-        furniture(d, min(max(t / duration, 0), 1))
+        furniture(d, min(max(t / duration, 0), 1), at=t)
         return frame
 
     # One frame to look at, instead of a clip to wait for: the studio shows

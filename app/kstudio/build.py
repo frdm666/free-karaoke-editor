@@ -124,7 +124,8 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
                colors=None, theme=None, keep_spans=None,
                cover_path: Optional[str] = None,
                cover_dark: Optional[int] = None,
-               cover_paths: Optional[list] = None) -> str:
+               cover_paths: Optional[list] = None,
+               grid: Optional[dict] = None) -> str:
     """tracks: {\'mix\'|\'instrumental\'|\'vocals\': (path, mime)} → path to the HTML."""
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
@@ -166,6 +167,12 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
         # behind the lyrics; the page keeps its single cover
         "covers": [_data_uri(cp, "image/jpeg") for cp in (cover_paths or [])
                    if cp and os.path.isfile(cp)],
+        # The beat, when the song keeps one: the video shows it as four quiet
+        # dots along the bottom edge, so a singer can see where the bar is
+        # without anything getting between them and the words.
+        "grid": ({"bpm": max(20.0, min(300.0, float(grid.get("bpm") or 120))),
+                  "beat0": max(0.0, float(grid.get("beat0") or 0.0))}
+                 if isinstance(grid, dict) and grid.get("pulse") else None),
         "engineLabel": ENGINE_LABEL.get(engine, engine),
         "audio": audio,
         "data": {

@@ -264,6 +264,12 @@
      pair is responsible for what. */
   /* the darkness knob dresses like a colour pick, but it is not one: the
      tests and the eye both count the picks as pairs of swatches */
+  .gridknob{display:flex; align-items:center; gap:5px; font-size:0.7812rem;
+            color:var(--dim)}
+  .gridknob input[type=number]{width:4.2rem; font:inherit; color:var(--text);
+            background:var(--card); border:1px solid var(--line);
+            border-radius:6px; padding:2px 4px}
+  .gridknob b{color:var(--dim)}
   .darkknob{display:flex; align-items:center; gap:6px; font-size:0.7812rem;
     color:var(--muted); padding-left:9px; border-left:1px solid var(--line);
     flex:none; white-space:nowrap}
@@ -677,6 +683,22 @@
       <button id="btnStill" data-tt="stillHint" data-t="showFrame"
               title="Show what the video will look like at this moment">▣ Frame</button>
       <span id="zoomNote">15 s</span>
+      <!-- A grid, the way a sequencer has one: bars of four, and sixteenths
+           when the zoom is close enough for them to mean anything. -->
+      <span class="gridknob" id="grpGrid" data-tt="gridHint"
+            title="A beat grid over the timeline: lines snap to it">
+        <label class="chk"><input type="checkbox" id="chkGrid"> <b data-t="gridOn">♩ Grid</b></label>
+        <input type="number" id="nBpm" min="20" max="300" step="0.1" value="120"
+               title="Beats per minute"><b>BPM</b>
+        <button id="btnBeatOne" data-t="beatOne"
+                title="The playhead is on beat one of a bar">⌖ 1</button>
+        <button id="btnTapTempo" data-t="tapTempo"
+                title="Tap in time with the song, four taps or more">⇥ Tap</button>
+        <label class="chk"><input type="checkbox" id="chkSixteen"> <span data-t="sixteenths">16ths</span></label>
+        <label class="chk" data-tt="pulseHint"
+               title="Show the beat in the video as four quiet dots in the corner"><input
+               type="checkbox" id="chkPulse"> <span data-t="pulseOn">pulse in the video</span></label>
+      </span>
       <span class="sp" style="flex:1"></span>
       <span id="selNote" data-t="noLine">no line selected</span>
       <button id="btnHere" class="pri" title="Enter" data-t="lineStartsHere">⌖ Line starts here</button>

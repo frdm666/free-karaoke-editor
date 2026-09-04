@@ -126,9 +126,14 @@ for (let i = 0; i < ZOOMS; i++)                 // back to the normal zoom
 await sleep(200);
 const LAST = proj.lines.length - 1;
 const blk = doc.querySelectorAll('#blocks .blk')[LAST];
+// The push has to clear the ten seconds below which a gap is a breath and
+// gets no countdown. It used to be 360 px, on the belief that five zoom-ins
+// and five zoom-outs come back to where they started — they did not, because
+// zooming in hit its floor and the way back overshot, so the same 360 px were
+// silently worth sixteen seconds instead of six.
 blk.dispatchEvent(pd('pointerdown', 200));
-w.dispatchEvent(pd('pointermove', 560));       // +360 px at 60 px/s = +6 s
-w.dispatchEvent(pd('pointerup', 560));
+w.dispatchEvent(pd('pointermove', 1100));      // +900 px at 60 px/s = +15 s
+w.dispatchEvent(pd('pointerup', 1100));
 await sleep(1000);                              // wait for the autosave
 const now = (await (await fetch(API+"/api/project/"+encodeURIComponent(PID))).json()).lines[LAST];
 ok('the last line was pushed away — a long interlude appeared',

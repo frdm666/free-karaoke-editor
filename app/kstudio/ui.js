@@ -357,6 +357,24 @@ const STR = {
     backdropWait: "Taking the clip\u2026 this can take a minute",
     backdropSet: "The clip stands behind the lyrics now",
     backdropGone: "The clip is gone — the still backdrop is back",
+    gridOn: "\u2669 Grid",
+    gridHint: "A grid of beats over the timeline, the way a sequencer has one: "
+      + "bars of four, and sixteenths when the zoom is close enough for them "
+      + "to be told apart. While it is on, a dragged line snaps to the beat "
+      + "instead of to the sound. Type the tempo, or tap it in; “\u2316 1” "
+      + "says the playhead is on beat one. Hold Alt while dragging to place a "
+      + "line exactly where your hand puts it.",
+    beatOne: "\u2316 1",
+    tapTempo: "\u21e5 Tap",
+    sixteenths: "16ths",
+    pulseOn: "pulse in the video",
+    pulseHint: "Show the beat in the video: four quiet dots in the bottom "
+      + "corner, one to a beat of the bar, so a singer can see where the bar "
+      + "is without anything coming between them and the words. It is drawn "
+      + "from the tempo you typed, so it is exactly as right as that number.",
+    beatOneSet: at => "Beat one is at " + at,
+    tapMore: n => "Keep tapping — " + n + " more",
+    tapDone: bpm => "Tempo: " + bpm + " BPM, counted from beat one here",
     coverUrlPh: "…or paste a link to a picture",
     coverUrlGo: "take it",
     coverUrlBad: "That is not a link: it should start with http",
@@ -767,6 +785,24 @@ const STR = {
     backdropWait: "Достаю клип\u2026 это может занять минуту",
     backdropSet: "Клип встал за текстом",
     backdropGone: "Клип убран — вернулся неподвижный фон",
+    gridOn: "\u2669 Сетка",
+    gridHint: "Сетка долей поверх дорожки, как в секвенсоре: такты по четыре, "
+      + "а шестнадцатые — когда масштаб достаточно крупный, чтобы их можно "
+      + "было различить. Пока она включена, строка при перетаскивании липнет "
+      + "к доле, а не к звуку. Темп наберите или отстучите; «\u2316 1» "
+      + "говорит, что курсор стоит на первой доле такта. Alt при "
+      + "перетаскивании ставит строку ровно туда, куда ведёт рука.",
+    beatOne: "\u2316 1",
+    tapTempo: "\u21e5 Отстучать",
+    sixteenths: "16-е",
+    pulseOn: "пульс в ролике",
+    pulseHint: "Показывать долю в ролике: четыре тихие точки в нижнем углу, "
+      + "по одной на долю такта, чтобы певец видел, где такт, и между ним и "
+      + "словами при этом ничего не стояло. Рисуется по набранному вами "
+      + "темпу — значит, ровно настолько же верен, насколько верно это число.",
+    beatOneSet: at => "Первая доля на " + at,
+    tapMore: n => "Стучите дальше — ещё " + n,
+    tapDone: bpm => "Темп: " + bpm + " BPM, отсчёт от первой доли здесь",
     coverUrlPh: "…или вставьте ссылку на картинку",
     coverUrlGo: "взять",
     coverUrlBad: "Это не ссылка: она начинается с http",
@@ -918,7 +954,7 @@ function relabel(){
     if (sel >= 0) $("selNote").textContent = T.lineNo(sel+1, fmtMs(lines[sel].start));
     else $("selNote").textContent = T.noLine;
     refreshVoice(); refreshKeep(); refreshRhythm(); drawSummary(lastData);
-    $("zoomNote").textContent = Math.round(zoom) + T.sec;
+    $("zoomNote").textContent = zoomText();
     // The reasons in “Check” come from the server — ask again in the new language.
     api(`/api/project/${encodeURIComponent(pid)}`)
       .then(d => showProblems(d.problems)).catch(() => {});
@@ -1703,6 +1739,11 @@ async function openProject(id){
   showMade("");
   refreshCover();
   refreshBackdrop();
+  const gsav = data.grid || {};
+  grid = {on: !!gsav.on, bpm: clamp(+gsav.bpm || 120, 20, 300),
+          beat0: +gsav.beat0 || 0, sub: gsav.sub === 4 ? 4 : 1,
+          pulse: !!gsav.pulse};
+  showGrid();
   colors = (Array.isArray(data.colors) && data.colors.length === 2)
     ? data.colors.slice() : ["#4de1ff", "#ff8ad1"];
   theme = (Array.isArray(data.theme) && data.theme.length === 2)
@@ -1715,7 +1756,7 @@ async function openProject(id){
   showProblems(data.problems);
   await loadAudio(id, data.tracks);
   lastData = data;
-  $("zoomNote").textContent = Math.round(zoom) + T.sec;
+  $("zoomNote").textContent = zoomText();
   drawSummary(data);            // the length is known only after the audio loads
   $("tDur").textContent = fmt(dur);
   drawWave();
@@ -2415,7 +2456,8 @@ async function saveNow(){
        noText: ($("edNoText").value || "").trim(),
        keepMarks: $("chkKeepMarks") ? $("chkKeepMarks").checked : true,
        checkOff, title: songName, artist: songArtist,
-       coverDark: (data && data.coverDark != null) ? data.coverDark : undefined});
+       coverDark: (data && data.coverDark != null) ? data.coverDark : undefined,
+       grid: (data && data.grid) ? data.grid : undefined});
     showProblems(r.problems);
     saveState("ok", T.savedOk);
   }catch(e){
@@ -2640,6 +2682,33 @@ function paintWave(){
     g.font = "10px system-ui, sans-serif";
     if (wd > 74) g.fillText(T.waveQuiet, x + 6, 12);
   });
+
+  // The beat grid, under everything a person put there: bars carry a line
+  // through the whole height, beats a shorter one, sixteenths only a tick —
+  // and only while there is room enough for them to be told apart.
+  if (grid.on){
+    const st = gridStep();
+    if (st > 0 && st * kq > 3){
+      const first = Math.floor((vq - grid.beat0) / st) - 1;
+      const beats = grid.sub || 1;
+      for (let n = first; ; n++){
+        const t = grid.beat0 + n * st;
+        const x = (t - vq) * kq;
+        if (x > w) break;
+        if (x < 0) continue;
+        // which of the four beats of a bar this is, and whether it is a beat
+        // at all rather than a subdivision between two
+        const idx = Math.round((t - grid.beat0) / st);
+        const onBeat = idx % beats === 0;
+        const onBar = idx % (beats * 4) === 0;
+        g.fillStyle = onBar ? "rgba(255,204,77,.30)"
+                    : onBeat ? "rgba(255,255,255,.16)"
+                             : "rgba(255,255,255,.07)";
+        g.fillRect(Math.round(x), onBar ? 0 : (onBeat ? 0 : h * 0.62),
+                   onBar ? 2 : 1, onBar ? h : (onBeat ? h : h * 0.38));
+      }
+    }
+  }
 
   // The marks a person made, and the one being dragged right now.
   const all = marks.concat(markFrom !== null && markTo !== null
@@ -2957,6 +3026,10 @@ window.addEventListener("pointermove", e => {
   }
   if (!drag) return;
   const dt = (e.clientX - drag.x0) / $("tlwrap").clientWidth * zoom;
+  // Hold Alt to place a line exactly where the hand puts it: the magnet that
+  // pulls to the start of a phrase is a help until the moment it is not, and
+  // then there was no way to overrule it.
+  const free = e.altKey;
   const ln = lines[drag.i];
   if (drag.grip && drag.all){
     // The whole line into the new span: every word moves, in proportion to its
@@ -2982,13 +3055,15 @@ window.addEventListener("pointermove", e => {
     const ceil = w0 ? (drag.words[0] + drag.durs[0]) - MIN_W : drag.end - 0.2;
     let ns = clamp(drag.start + dt, 0, ceil);
     if (ns >= ceil - 0.001) hitLimit();
-    const snap2 = nearestOnset(ns);
+    const snap2 = free ? null : (grid.on ? nearestBeat(ns) : nearestOnset(ns));
     if (snap2 !== null && Math.abs(snap2 - ns) < zoom*0.012) ns = clamp(snap2, 0, ceil);
     ln.start = ns;
     if (w0){ w0.t = ns; w0.d = (drag.words[0] + drag.durs[0]) - ns; }
   } else {
     let ns = Math.max(0, drag.start + dt);
-    const snap = nearestOnset(ns);            // snap to the start of a phrase
+    // With the grid on, the beat is what a line belongs to; without it, the
+    // start of a phrase in the sound.
+    const snap = free ? null : (grid.on ? nearestBeat(ns) : nearestOnset(ns));
     if (snap !== null && Math.abs(snap-ns) < zoom*0.012) ns = snap;
     const d = ns - drag.start;
     ln.start = ns; ln.end = drag.end + d;
@@ -3465,8 +3540,92 @@ window.addEventListener("pointerup", () => {
   drawWave();
 });
 
-function setZoom(z){ zoom=clamp(z,4,120);
-  $("zoomNote").textContent=Math.round(zoom)+T.sec; layoutBlocks(); drawWave(); drawBlocks(); }
+/* ---------- the beat grid ----------
+   A song at one tempo is a ruler: every line begins on a beat, and placing
+   them by eye against a waveform is doing arithmetic with a magnifying glass.
+   Four beats to a bar, sixteenths when the zoom is close enough for them to
+   mean anything, and the lines snap to it while it is on. Nothing here guesses
+   at the music: the tempo is typed, or tapped in, and the first beat is put
+   where the playhead stands. */
+let grid = {on: false, bpm: 120, beat0: 0, sub: 1, pulse: false};
+
+function gridStep(){
+  const bpm = clamp(+grid.bpm || 120, 20, 300);
+  return 60 / bpm / (grid.sub || 1);
+}
+function nearestBeat(t){
+  const st = gridStep();
+  if (!(st > 0)) return null;
+  return grid.beat0 + Math.round((t - grid.beat0) / st) * st;
+}
+function showGrid(){
+  $("chkGrid").checked = !!grid.on;
+  $("chkSixteen").checked = grid.sub === 4;
+  $("chkPulse").checked = !!grid.pulse;
+  if (document.activeElement !== $("nBpm")) $("nBpm").value = grid.bpm;
+}
+function saveGrid(){
+  if (!data) return;
+  data.grid = {on: !!grid.on, bpm: +grid.bpm, beat0: +grid.beat0,
+               sub: grid.sub, pulse: !!grid.pulse};
+  touched();
+  drawWave(); drawBlocks();
+}
+$("chkGrid").addEventListener("change", () => {
+  grid.on = $("chkGrid").checked; saveGrid();
+});
+$("chkSixteen").addEventListener("change", () => {
+  grid.sub = $("chkSixteen").checked ? 4 : 1; saveGrid();
+});
+// The pulse is for the video, not for the window: a person can work with the
+// grid on the timeline and want nothing of it in the clip, or the other way.
+$("chkPulse").addEventListener("change", () => {
+  grid.pulse = $("chkPulse").checked;
+  saveGrid();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+});
+$("nBpm").addEventListener("input", () => {
+  grid.bpm = clamp(+$("nBpm").value || 120, 20, 300); saveGrid();
+});
+$("nBpm").addEventListener("keydown", e => {
+  e.stopPropagation();                    // digits are digits, not hotkeys
+  if (e.key === "Enter"){ e.preventDefault(); $("nBpm").blur(); }
+});
+$("btnBeatOne").addEventListener("click", () => {
+  grid.beat0 = mediaTime();
+  if (!grid.on){ grid.on = true; showGrid(); }
+  saveGrid();
+  toast(T.beatOneSet(fmtMs(grid.beat0)));
+});
+// Tapping is how a person knows a tempo without being told it: four taps or
+// more, and the spacing between them is the answer. Taps more than three
+// seconds apart start a new count — that is somebody coming back to it later,
+// not a very slow song.
+let taps = [];
+$("btnTapTempo").addEventListener("click", () => {
+  const now = performance.now() / 1000;
+  if (taps.length && now - taps[taps.length - 1] > 3) taps = [];
+  taps.push(now);
+  if (taps.length < 4){ toast(T.tapMore(4 - taps.length)); return; }
+  taps = taps.slice(-8);
+  const span = taps[taps.length - 1] - taps[0];
+  const bpm = clamp(60 * (taps.length - 1) / span, 20, 300);
+  grid.bpm = Math.round(bpm * 10) / 10;
+  grid.beat0 = mediaTime();
+  grid.on = true;
+  showGrid(); saveGrid();
+  toast(T.tapDone(grid.bpm));
+});
+
+// Half a second across the window is close enough to place a word by eye. The
+// floor used to be four seconds, and at four seconds the magnet still reaches
+// a couple of frames either side — so the one thing a person could do about it,
+// zoom in further, was the one thing they could not do.
+function setZoom(z){ zoom=clamp(z,0.5,120);
+  $("zoomNote").textContent=zoomText(); layoutBlocks(); drawWave(); drawBlocks(); }
+function zoomText(){
+  return (zoom < 2 ? zoom.toFixed(1) : String(Math.round(zoom))) + T.sec;
+}
 $("btnZoomIn").addEventListener("click", ()=>setZoom(zoom/1.6));
 // A line is a couple of seconds long and the view is fifteen: to see the words
 // apart one had to zoom in by hand every time. This does it in one press.

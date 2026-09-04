@@ -441,6 +441,29 @@ on your own music.
   the song through by pressing Space on every line, undo, save the page with
   your edits.
 
+## The beat, when the song keeps one
+
+**`♩ Grid`** lays a grid of beats over the timeline, the way a sequencer does:
+bars of four, and sixteenths when the zoom is close enough for them to be told
+apart. While it is on, a dragged line snaps to the beat instead of to the
+sound — for a song at one tempo that is arithmetic done for you.
+
+Nothing here guesses at the music. Type the tempo, or press **`⇥ Tap`** four
+times or more in time with it; **`⌖ 1`** says the playhead is standing on beat
+one of a bar. The tempo and that first beat are kept with the song.
+
+**`pulse in the video`** carries the beat into the clip: four quiet dots in
+the bottom corner, one to a beat of the bar, brightening as each strikes and
+falling back between. The opening counts in the same beat, so the first note
+does not catch you outside the bar. It is drawn from the tempo you gave it and
+knows nothing of the music, so a song with living drums will drift away from
+it.
+
+The timeline zooms down to half a second across, which is close enough to
+place a word by eye. And **holding Alt while dragging** puts a line exactly
+where your hand puts it — the magnet that pulls to the start of a phrase, or
+to the beat, is a help until the moment it is not.
+
 ## Finding your way around a long song
 
 Above the timeline stands a strip with the whole song on it: the marked

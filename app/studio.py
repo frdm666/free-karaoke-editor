@@ -622,7 +622,8 @@ class Handler(BaseHTTPRequestHandler):
                                     check_off=body.get("checkOff"),
                                     title=body.get("title"),
                                     artist=body.get("artist"),
-                                    cover_dark=body.get("coverDark"))
+                                    cover_dark=body.get("coverDark"),
+                                    grid=body.get("grid"))
                 return self._json({"ok": True, "problems": P.problems(data)})
 
             m = re.match(r"^/api/project/([^/]+)/cover$", path)
@@ -1450,7 +1451,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      cover_dark=data.get("coverDark"),
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None))
+                                  if data.get("coverBg") else None),
+                     grid=data.get("grid"))
         log(tr(f"Done: {out}", f"Готово: {out}"))
         return {"kind": "html", "path": out}
 
@@ -1508,7 +1510,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      cover_dark=data.get("coverDark"),
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None))
+                                  if data.get("coverBg") else None),
+                     grid=data.get("grid"))
         out = os.path.join(out_dir, base + ".mp4")
 
         class Args:
@@ -1712,7 +1715,8 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
                      cover_dark=data.get("coverDark"),
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None))
+                                  if data.get("coverBg") else None),
+                     grid=data.get("grid"))
         payload = B.read_payload(page)
 
         class Args:

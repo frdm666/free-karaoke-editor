@@ -271,6 +271,39 @@ if (backIn.id){
   await post(`/api/project/${encodeURIComponent(backIn.id)}/delete`, {});
 }
 
+console.log('\n--- the beat grid ---');
+// A song at one tempo is a ruler. The grid has to survive a save and a
+// reopening, and the drawing has to cope with it — a canvas that throws takes
+// the whole editor down with it.
+{
+  await p.evaluate(() => {
+    document.getElementById('chkGrid').click();
+    const b = document.getElementById('nBpm');
+    b.value = '174'; b.dispatchEvent(new Event('input', {bubbles: true}));
+  });
+  await sleep(300);
+  await p.click('#btnBeatOne');
+  await sleep(1200);
+  const rec = await get('/api/project/' + encodeURIComponent(pid));
+  ok('the grid is saved with the song',
+     rec.grid && rec.grid.on === true && Math.abs(rec.grid.bpm - 174) < 0.01,
+     JSON.stringify(rec.grid));
+  await p.evaluate(() => {
+    document.getElementById('chkSixteen').click();
+  });
+  await sleep(900);
+  const rec2 = await get('/api/project/' + encodeURIComponent(pid));
+  ok('and sixteenths are remembered too', rec2.grid && rec2.grid.sub === 4,
+     JSON.stringify(rec2.grid));
+  // zoom right in: the floor used to be four seconds, and the magnet reached
+  // far enough at four seconds that there was nothing to be done about it
+  const deep = await p.evaluate(() => {
+    for (let i = 0; i < 12; i++) document.getElementById('btnZoomIn').click();
+    return document.getElementById('zoomNote').textContent;
+  });
+  ok('the timeline zooms in past a second', /^0\.\d/.test(deep.trim()), deep);
+}
+
 console.log('\n--- a clip can stand behind the lyrics ---');
 // The backdrop is a real file here, made on the spot: the endpoint is the
 // only place that turns any clip into the small one a song carries around.

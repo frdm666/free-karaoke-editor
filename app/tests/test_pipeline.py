@@ -1634,6 +1634,28 @@ def main():
           and all(u.startswith("data:image") for u in pay_cv["covers"]),
           len(pay_cv.get("covers") or []))
 
+    print("\nThe beat grid belongs to the song")
+    # A tempo counted once should still be there tomorrow — and nonsense typed
+    # into the field must not reach the record.
+    import shutil as _sh
+    grid_dir = os.path.join(tmp, "gridsong")
+    _sh.copytree(with_cover, grid_dir)
+    rec_g = PRJ.save_lines(grid_dir, json.load(
+        open(os.path.join(grid_dir, "project.json"), encoding="utf-8"))["lines"],
+        grid={"on": True, "bpm": 174.5, "beat0": 1.25, "sub": 4, "pulse": True})
+    check("the grid is kept with the song",
+          rec_g.get("grid") == {"on": True, "bpm": 174.5, "beat0": 1.25,
+                                "sub": 4, "pulse": True},
+          rec_g.get("grid"))
+    rec_g2 = PRJ.save_lines(grid_dir, rec_g["lines"],
+                            grid={"on": True, "bpm": 9000, "beat0": -5, "sub": 7})
+    g2 = rec_g2.get("grid") or {}
+    check("a tempo nobody can play is brought back into range",
+          g2.get("bpm") == 300.0 and g2.get("beat0") == 0.0 and g2.get("sub") == 1,
+          g2)
+    check("and the pulse is a choice of its own, not part of the grid",
+          g2.get("pulse") is False, g2.get("pulse"))
+
     print("\nA song travels in one file")
     # A project folder stands on its own but does not travel — not to another
     # computer, not into a backup. Packed and unpacked it is the same song.

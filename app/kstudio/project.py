@@ -320,7 +320,7 @@ def unpack(zip_path: str, root: str) -> str:
 
 def save_lines(folder: str, lines: List[Dict], colors=None, theme=None,
                no_text=None, keep_marks=None, check_off=None,
-               title=None, artist=None, cover_dark=None) -> Dict:
+               title=None, artist=None, cover_dark=None, grid=None) -> Dict:
     data = load(folder)
     data["lines"] = lines
     if colors:
@@ -332,6 +332,14 @@ def save_lines(folder: str, lines: List[Dict], colors=None, theme=None,
     # after a re-timing.
     if no_text is not None:
         data["noText"] = str(no_text)
+    if isinstance(grid, dict):
+        # The beat grid belongs to the song, not to the window: a tempo counted
+        # once should still be there tomorrow.
+        data["grid"] = {"on": bool(grid.get("on")),
+                        "bpm": max(20.0, min(300.0, float(grid.get("bpm") or 120))),
+                        "beat0": max(0.0, float(grid.get("beat0") or 0.0)),
+                        "sub": 4 if int(grid.get("sub") or 1) == 4 else 1,
+                        "pulse": bool(grid.get("pulse"))}
     if keep_marks is not None:
         data["keepMarks"] = bool(keep_marks)
     if check_off is not None:

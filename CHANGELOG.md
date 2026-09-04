@@ -7,6 +7,30 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.47.0
+
+**A grid of beats over the timeline, the way a sequencer has one.** Bars of
+four, and sixteenths when the zoom is close enough for them to be told apart.
+While it is on, a dragged line snaps to the beat instead of to the sound —
+for a song that keeps one tempo that is arithmetic done for you. Nothing
+guesses at the music: the tempo is typed or tapped in, four taps or more, and
+“⌖ 1” says the playhead is standing on beat one. Both are kept with the song.
+
+**And the video can show that beat.** Four quiet dots in the bottom corner,
+one to a beat of the bar, brightening as each one strikes and falling back
+between: a pulse to come in on, sitting where nothing stands between a singer
+and the words. The opening counts in the same beat, so by the first note you
+are already inside the bar. It is drawn from the tempo that was typed, so it
+is exactly as right as that number — a song with living drums will drift from
+it, and that is the song, not the arithmetic.
+
+**The timeline stopped at four seconds across, and the magnet reached inside
+that.** So the one thing a person could do about a line that would not sit
+where they put it — zoom in further — was the one thing they could not do. It
+goes down to half a second now. And holding Alt while dragging suspends the
+magnet altogether: a pull towards the start of a phrase is a help until the
+moment it is not, and there was no way to overrule it.
+
 ## 4.46.0
 
 **A line can now be written with both its ends.** `[1:05.25-1:09.5] the line`

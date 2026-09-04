@@ -412,6 +412,49 @@ def main():
     check("the picture behind is bright, so the ring earned it",
           open_l > 120, f"{open_l:.0f} of 255")
 
+    print("\nThe beat, shown as a pulse in the corner")
+    # A song that keeps one tempo can show it: four dots along the bottom, one
+    # to a beat of the bar. It must read as a pulse and not a row of lamps —
+    # bright on the beat, faded between two — and it must not appear at all
+    # unless the singer asked for it.
+    beat_words = "we come in on the beat now".split()
+    beat_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                 "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                 "grid": {"bpm": 120.0, "beat0": 0.0},   # a beat every half second
+                 "data": {"title": "Pulse", "duration": 12.0, "lines": [
+        {"text": " ".join(beat_words), "start": 2.0, "end": 8.0, "voice": 1,
+         "words": [{"w": w, "t": 2.0 + i * 0.85, "d": 0.85, "s": 1}
+                   for i, w in enumerate(beat_words)]}]}}
+    wav_p = tone(os.path.join(tmp, "p.wav"), 220.0, 12.0)
+
+    def corner(at, with_grid=True):
+        class AP:
+            width, height, fps, crf = 640, 360, 10, 30
+            preset, font, timings = "ultrafast", None, None
+            start, seconds, audio = 0.0, 0.0, "minus"
+            intro = False
+        a = AP(); a.still = at
+        a.output = os.path.join(tmp, f"pulse-{at}-{int(with_grid)}.png")
+        song = beat_song if with_grid else {k: v for k, v in beat_song.items()
+                                            if k != "grid"}
+        video.render(song, wav_p, a.output, a)
+        im = Image.open(a.output).convert("RGB")
+        Wp, Hp = im.size
+        # the strip the dots live in: bottom edge, right half
+        return im.crop((int(Wp * 0.6), int(Hp * 0.88), Wp, int(Hp * 0.96)))
+
+    def brightest(strip):
+        return max(sum(p) for p in strip.getdata())
+
+    on_beat = brightest(corner(4.02))          # a beat has just struck
+    off_beat = brightest(corner(4.35))         # well between two
+    none_at_all = brightest(corner(4.02, with_grid=False))
+    check("on the beat the corner lights up", on_beat > 300, on_beat)
+    check("and between beats it falls back", off_beat < on_beat - 90,
+          f"{on_beat} -> {off_beat}")
+    check("without a tempo of its own the corner stays quiet",
+          none_at_all < off_beat + 30, f"{none_at_all} vs {off_beat}")
+
     print("\nA clip may stand behind the lyrics, and the words still hold")
     # A backdrop that moves is the case a fixed darkening cannot serve: the
     # number that suited a dark shot blows out on the next cut. The clip here
