@@ -1190,6 +1190,43 @@ def main():
           all(ln.start >= 15.5 for ln in got3.lines[2:]),
           [round(ln.start, 1) for ln in got3.lines])
 
+    # A time on both sides — “[0:05-0:08.5]” — is not a peg but a placement:
+    # somebody who has listened and written down where a line begins AND ends
+    # does not want it improved upon. Hundredths are enough; thousandths were
+    # never required.
+    both = L.parse("[0:02-0:05.25] раз строка тут\nдва строка тут\n"
+                   "[0:16] три строка тут\n[0:20] четыре строка тут")
+    check("a written end survives the parsing",
+          (both.lines[0].start, both.lines[0].end) == (2.0, 5.25),
+          (both.lines[0].start, both.lines[0].end))
+    check("and a line with no end of its own still has one filled in",
+          both.lines[2].end == 20.0 and not both.lines[2].held,
+          (both.lines[2].end, both.lines[2].held))
+    check("an end before its own start is refused",
+          L.parse("[0:40-0:39] строка тут").lines[0].end is None)
+    # Somebody writing forty of these by hand leaves a space in one of them,
+    # and a bracket that lands in the words instead of in the timing takes a
+    # whole line out of the song without saying anything. It also drags the
+    # line above it along: that one's end is then filled from the next timed
+    # line, which is now much further away.
+    loose = L.parse("[ 00:05-00:09.27 ] раз строка тут\n"
+                    "[00:45.72 ] два строка тут\n[1:00] три строка тут")
+    check("a space inside the brackets is forgiven",
+          [ln.start for ln in loose.lines] == [5.0, 45.72, 60.0],
+          [(ln.start, ln.text[:12]) for ln in loose.lines])
+    check("and the line above keeps the end it should have",
+          abs(loose.lines[0].end - 9.27) < 1e-9, loose.lines[0].end)
+    said_b = []
+    got_b, _ = A.align(both, song, 26.0, engine="energy", log=said_b.append)
+    check("the placed line is where it was written, to the hundredth",
+          abs(got_b.lines[0].start - 2.0) < 1e-6
+          and abs(got_b.lines[0].end - 5.25) < 1e-6,
+          (got_b.lines[0].start, got_b.lines[0].end))
+    check("and the aligner is told so out loud",
+          any("конец" in m or "end as well" in m for m in said_b), said_b[:3])
+    check("what follows begins where the placed line ended, not where it began",
+          got_b.lines[1].start >= 5.25 - 1e-6, got_b.lines[1].start)
+
     # A peg written out of order is refused with a word, not obeyed.
     disorder = L.parse("[0:16] раз строка тут\n[0:04] два строка тут\nтри строка тут")
     said_d = []

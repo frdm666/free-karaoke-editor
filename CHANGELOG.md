@@ -7,6 +7,31 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.46.0
+
+**A line can now be written with both its ends.** `[1:05.25-1:09.5] the line`
+places it exactly as it stands: nothing re-times it, and the aligner is only
+asked about what lies between such lines. One time on its own is still a peg —
+the model lays out the words around it — and this is the other thing, for
+somebody who has listened, written down where a line begins and ends, and does
+not want it improved upon. An end earlier than its own start is ignored.
+
+An end filled in from the line below is a guess; an end written by hand is an
+instruction. The two were the same field, so the fill-in quietly overwrote what
+had been typed, and every peg then looked as though it had been placed by hand.
+They are told apart now.
+
+**A space inside the brackets no longer eats the line.** `[00:45.72 ]` — with
+one space before the bracket closes — was not read as a time at all: the whole
+bracket went into the song as words, and the line stood unplaced. It took the
+line above it down as well, whose end was then filled in from the next timed
+line, much further away. Somebody writing forty of these by hand will leave a
+space in one of them. Spaces inside the brackets are forgiven now.
+
+**Hundredths were always enough.** `[1:05.25]` has worked all along; only the
+manual said `[mm:ss.ddd]` in one place and taught people to write a third digit
+that changes nothing.
+
 ## 4.45.0
 
 **Whatever installs the libraries is what opens the program now.** A machine

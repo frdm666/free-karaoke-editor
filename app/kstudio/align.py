@@ -1521,6 +1521,7 @@ def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
             have_whisper = False
 
     pegs = []
+    pinned = {}
     for i, ln in enumerate(lyrics.lines):
         if ln.start is None:
             continue
@@ -1534,6 +1535,10 @@ def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
             ln.start = None
             continue
         pegs.append((i, ln.start))
+        if getattr(ln, "held", False) and ln.end is not None and ln.end > ln.start:
+            # Both ends written down: the line is placed as it stands, and the
+            # aligner is only ever asked about what lies between such lines.
+            pinned[i] = (ln.start, ln.end)
     if not pegs:
         return align_whisper(lyrics, audio_path, duration, model_name, language,
                              device, log, isolated=isolated, skip=skip)
@@ -1551,17 +1556,37 @@ def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
                "  stable-ts не установлен — каждый кусок разложу по громкости, "
                "но в пределах своих привязок"))
 
+    if pinned:
+        log(tr(f"  {len(pinned)} of them carry an end as well and are left "
+               f"exactly where they are written",
+               f"  у {len(pinned)} из них указан и конец — эти встанут ровно "
+               f"так, как написаны"))
+
     # A peg opens a stretch; the one before the first peg is a stretch too.
+    # A line pinned at both ends is a stretch of one, laid out and not aligned,
+    # and the stretch after it begins where it ends rather than where it starts.
     bounds = []
     if pegs[0][0] > 0:
-        bounds.append((0, pegs[0][0] - 1, 0.0, pegs[0][1]))
+        bounds.append((0, pegs[0][0] - 1, 0.0, pegs[0][1], False))
     for k, (i, t) in enumerate(pegs):
         last = (pegs[k + 1][0] - 1) if k + 1 < len(pegs) else len(lyrics.lines) - 1
         end = pegs[k + 1][1] if k + 1 < len(pegs) else duration
-        bounds.append((i, last, t, end))
+        if i in pinned:
+            t, done = pinned[i]
+            bounds.append((i, i, t, done, True))
+            if i + 1 <= last:
+                bounds.append((i + 1, last, done, end, False))
+        else:
+            bounds.append((i, last, t, end, False))
 
     out: List = []
-    for a, b, t0, t1 in bounds:
+    for a, b, t0, t1, fixed in bounds:
+        if fixed:
+            ln = lyrics.lines[a]
+            ln.start, ln.end = t0, t1
+            _spread(ln.words, t0, t1)
+            out.append(ln)
+            continue
         piece = Lyrics(lines=lyrics.lines[a:b + 1])
         for ln in piece.lines:
             ln.start = ln.end = None

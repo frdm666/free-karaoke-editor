@@ -274,6 +274,13 @@ Second line
   the neighbouring word.
 * `[00:12.34] line` — a ready LRC timing. If the file has them, alignment is
   skipped.
+* `[1:05] a line` — the second the line is sung. A few of these are pegs: the
+  model still lays out everything between them, but a line can no longer
+  wander across the song. Hundredths are enough — `[1:05.25]` — and a third
+  digit is never needed.
+* `[1:05.25-1:09.5] a line` — both ends written down. Such a line is placed
+  exactly as it stands and nothing re-times it; the aligner is only asked
+  about what lies between. An end earlier than its own start is ignored.
 * `for=ev=er=more` — a syllable break. The pieces are timed one by one, so a held
   note lights up syllable by syllable, and the mark itself is never shown: on
   screen, on the page and in the video the word is whole. A soft hyphen works

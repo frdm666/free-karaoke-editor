@@ -10,7 +10,15 @@ VOWELS_RU = set("аеёиоуыэюя")
 VOWELS_EN = set("aeiouy")
 
 # [00:12.34] line text  (classic LRC)
-LRC_RE = re.compile(r"^\s*\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]\s*(.*)$")
+# “[1:05]”, “[1:05.25]” — where a line starts. A second time after a dash,
+# “[1:05.25-1:09.5]”, says where it ends as well: then the line is placed
+# exactly as written and nothing re-times it.
+# Spaces inside the brackets are forgiven — “[00:45.72 ]” is what a person
+# writing forty of these by hand ends up with, and a bracket that lands in the
+# words instead of in the timing is a whole line silently unplaced.
+LRC_RE = re.compile(r"^\s*\[\s*(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)"
+                    r"(?:\s*[-\u2013\u2014]\s*(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?))?"
+                    r"\s*\]\s*(.*)$")
 # [Chorus] on its own line is a section heading — square brackets are what
 # people conventionally use for that.
 SECTION_RE = re.compile(r"^\s*\[\s*([^\]]{1,40}?)\s*\]\s*$")
@@ -159,6 +167,10 @@ class Line:
     keep: bool = False                 # keep the original voice on this stretch
     keep_soft: bool = False            # …but quietly, to be sung along with
     lock: bool = False                 # put right by hand: re-timing leaves it alone
+    # Both ends written into the text — “[0:05-0:08.5]”. An end filled in from
+    # the line below is a guess and may be improved upon; one written by hand
+    # is an instruction, and the two must not be confused.
+    held: bool = False
     # split off the tail of the line above: a duet with it, not a line after it.
     # Not saved with the song — re-parsing the text derives it again.
     tail: bool = False
@@ -251,10 +263,12 @@ def _split_words(text: str) -> List[Word]:
     return out
 
 
+def _lrc_seconds(mm: str, ss: str) -> float:
+    return int(mm) * 60 + float(ss.replace(":", "."))
+
+
 def _parse_lrc_time(m: re.Match) -> float:
-    mm = int(m.group(1))
-    ss = float(m.group(2).replace(":", "."))
-    return mm * 60 + ss
+    return _lrc_seconds(m.group(1), m.group(2))
 
 
 def parse(raw: str) -> Lyrics:
@@ -282,9 +296,16 @@ def parse(raw: str) -> Lyrics:
 
         m = LRC_RE.match(line)
         start = None
+        finish = None
         if m:
             start = _parse_lrc_time(m)
-            line = m.group(3).strip()
+            if m.group(3):
+                # A line given both its ends is placed exactly as written; the
+                # aligner is only told what stands between such lines.
+                finish = _lrc_seconds(m.group(3), m.group(4))
+                if finish <= start:
+                    finish = None
+            line = m.group(5).strip()
             if not line:
                 continue
 
@@ -354,7 +375,8 @@ def parse(raw: str) -> Lyrics:
         for k in range(times):
             lyr.lines.append(Line(text=shown, words=_split_words(line),
                                   section=pending_section if k == 0 else None,
-                                  start=start, backing=backing,
+                                  start=start, end=finish,
+                                  held=finish is not None, backing=backing,
                                   voice=voice or (2 if backing else cur_voice)))
             if trail:
                 lyr.lines.append(Line(text=trail_shown, words=_split_words(trail),
@@ -362,10 +384,11 @@ def parse(raw: str) -> Lyrics:
                                       voice=2, tail=True))
         pending_section = None
 
-    # with manual timings, a line ends where the next one begins
+    # With manual timings a line ends where the next one begins — unless it was
+    # given an end of its own, which is not a guess to be improved upon.
     if lyr.has_manual_times:
         for i, ln in enumerate(lyr.lines):
-            if ln.start is None:
+            if ln.start is None or ln.end is not None:
                 continue
             nxt = next((l for l in lyr.lines[i + 1:] if l.start is not None), None)
             ln.end = nxt.start if nxt else None
