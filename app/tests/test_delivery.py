@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import re
@@ -159,6 +161,80 @@ def main():
     finally:
         os.environ["PYTHONPATH"] = os.environ["PYTHONPATH"][len(late) + 1:]
         shutil.rmtree(late, ignore_errors=True)
+
+    # Whatever installed the libraries has to be what starts the program. A
+    # machine holds several Pythons, and a double-clicked script does not read
+    # the same profile as a terminal, so “whichever python3 the shell offers”
+    # was one interpreter for the setup and another for the window — with
+    # everything the setup installed invisible to the program.
+    mark = os.path.join(ROOT, setup.PY_MARK)
+    had = open(mark, encoding="utf-8").read() if os.path.isfile(mark) else None
+    try:
+        wrote = setup.remember_python()
+        check("the setup writes down the Python it ran on", bool(wrote))
+        check("and it is this very interpreter",
+              open(mark, encoding="utf-8").read().strip() == sys.executable,
+              open(mark, encoding="utf-8").read().strip())
+
+        if os.name != "nt":
+            # The launcher must take that one, not whatever the shell offers.
+            fake_dir = tempfile.mkdtemp(prefix="karaoke_py_")
+            fake = os.path.join(fake_dir, "python3")
+            open(fake, "w").write('#!/bin/bash\necho "TAKEN:$*"\n')
+            os.chmod(fake, 0o755)
+            open(mark, "w", encoding="utf-8").write(fake + "\n")
+            r2 = run(["/bin/bash", os.path.join(HOME, "studio.command")],
+                     timeout=30)
+            check("and the launcher starts the program with that one",
+                  "TAKEN:" in r2.stdout and "studio.py" in r2.stdout,
+                  r2.stdout.strip()[:80])
+            shutil.rmtree(fake_dir, ignore_errors=True)
+            # …and when the recorded one is gone, the shell's own is used
+            open(mark, "w", encoding="utf-8").write(fake + "\n")
+            r3 = run(["/bin/bash", "-c",
+                      f'MARK="{mark}"; PY=""; '
+                      'if [ -r "$MARK" ]; then SAVED="$(head -n 1 "$MARK")"; '
+                      'if [ -n "$SAVED" ] && "$SAVED" -c "" >/dev/null 2>&1; '
+                      'then PY="$SAVED"; fi; fi; '
+                      'if [ -z "$PY" ]; then PY="fell-back"; fi; echo "$PY"'],
+                     timeout=20)
+            check("a recorded Python that no longer runs is not obeyed",
+                  "fell-back" in r3.stdout, r3.stdout.strip())
+    finally:
+        if had is None:
+            try:
+                os.remove(mark)
+            except OSError:
+                pass
+        else:
+            open(mark, "w", encoding="utf-8").write(had)
+
+    # A Python that forbids installing into itself (PEP 668) is the ordinary
+    # case on a Mac with Homebrew and on most Linux distributions now. The
+    # setup used to answer pip's refusal with “check the internet or your
+    # access rights” — two things that had nothing to do with it — and every
+    # package silently failed to install.
+    calls = []
+    real_call, real_marker = setup.subprocess.call, setup.externally_managed
+    setup.externally_managed = lambda: True
+    setup.subprocess.call = lambda cmd, **kw: (calls.append(cmd), 1)[1]
+    said = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(said):
+            ok_install = setup.pip_install("some-package")
+    finally:
+        setup.subprocess.call, setup.externally_managed = real_call, real_marker
+    words = said.getvalue()
+    check("a forbidden environment is not fought head-on",
+          calls and "--user" in calls[0] and "--break-system-packages" in calls[0],
+          calls[0] if calls else calls)
+    check("and an older pip, which knows no such flag, still gets a plain --user",
+          any("--break-system-packages" not in c and "--user" in c for c in calls),
+          [c[-3:] for c in calls])
+    check("the failure names the rule, not the internet",
+          not ok_install and "PEP 668" in words and "venv" in words
+          and "internet" not in words.lower() and "интернет" not in words.lower(),
+          words.strip().splitlines()[-3:])
 
     # ffmpeg missing and refused: the steps below have nothing to do with it,
     # so they must still run — the settings file among them.

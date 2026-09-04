@@ -165,6 +165,16 @@ to the projects — the same place a dropped file lands. It needs `yt-dlp`:
 pip install yt-dlp
 ```
 
+The setup also writes down the Python it installed into, and the launchers
+read that first — so whatever put the libraries on the disk is what opens the
+program. Without it a machine with several Pythons could install into one and
+start on another, which is the same thing wearing a different hat every time.
+
+If pip answers `externally-managed-environment`, that is PEP 668: the Python
+itself forbids installing into it, and Homebrew ships it that way. `Install.bat`
+and `install.command` know that refusal and put the packages in your own folder
+instead — so run the setup rather than pip by hand.
+
 If the window still says it is not installed after you installed it, the two
 are talking about different Pythons: a machine holds several, a terminal
 reaches one and a double-clicked window finds another, and pip leaves yt-dlp

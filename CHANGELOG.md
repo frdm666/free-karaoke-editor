@@ -7,6 +7,40 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.45.0
+
+**Whatever installs the libraries is what opens the program now.** A machine
+holds several Pythons, and a double-clicked script does not read the same
+profile as a terminal: the same launcher, the same line of shell, could find
+one interpreter on a double-click and another from a Terminal window. So the
+setup installed into one Python and the window started on another, and
+everything the setup had just put on the disk was invisible to the program —
+no word-by-word timing, no instrumental, no video library, though all three
+had installed without an error.
+
+The setup writes down the interpreter it ran on, beside the program, and every
+launcher on both systems reads that first. A recorded Python that no longer
+runs is ignored and the old search takes over, so moving or deleting it breaks
+nothing. The file is this machine's own and is not in the repository.
+
+## 4.44.5
+
+**The setup installed nothing on a Mac with Homebrew, and blamed the Wi-Fi.**
+Most Pythons now ship a marker saying packages may not be installed into them
+— PEP 668 — and pip obeys it and refuses outright. Every step of the setup hit
+that refusal: the word-by-word timing, the instrumental, the video library,
+the faster analysis. All four failed, and to each the setup answered “check
+the internet or your access rights”, neither of which had anything to do with
+it. Somebody could run the setup, answer yes to everything, watch it finish,
+and have exactly nothing installed.
+
+The refusal is recognised now, by the marker rather than by guessing at pip's
+words, and the packages go into the person's own folder instead — where
+Homebrew itself says they belong. An older pip that has never heard of the
+flag gets a plain `--user`. And when even that is refused the message says
+what the rule is and how a virtual environment gets round it, with the
+commands already filled in.
+
 ## 4.44.4
 
 **Locked lines were ignored by the very people who needed them.** Lock a line

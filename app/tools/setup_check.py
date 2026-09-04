@@ -9,6 +9,7 @@ import shutil
 import site
 import subprocess
 import sys
+import sysconfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -54,16 +55,84 @@ def installed(module: str) -> bool:
                            stderr=subprocess.DEVNULL) == 0
 
 
+PY_MARK = ".python-path"
+
+
+def remember_python() -> str:
+    """Write down the interpreter this setup ran on, beside the program.
+
+    A machine holds several Pythons, and the launchers used to take whichever
+    `python3` the shell offered them — which is not the same shell for a
+    double-click as for a terminal. So the setup could install into one and
+    the window could start on another, and everything installed here was
+    invisible there. The launchers read this file first now: whatever put the
+    packages on the disk is what opens the program.
+    """
+    app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(app, PY_MARK)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(sys.executable + "\n")
+    except OSError:
+        return ""
+    return path
+
+
+def externally_managed() -> bool:
+    """PEP 668: this Python says “do not install into me”.
+
+    Homebrew and most Linux distributions ship a marker file beside the
+    standard library, and pip obeys it and refuses outright. The refusal has
+    nothing whatever to do with the internet or with access rights, which is
+    what this script used to blame — and so a person was sent to check their
+    Wi-Fi over a rule written into their own Python.
+    """
+    try:
+        return os.path.isfile(os.path.join(sysconfig.get_path("stdlib"),
+                                           "EXTERNALLY-MANAGED"))
+    except Exception:
+        return False
+
+
 def pip_install(*pkgs) -> bool:
     print(tr(f"\nInstalling: {' '.join(pkgs)}\n", f"\nСтавлю: {' '.join(pkgs)}\n") + "-" * 60)
-    code = subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade", *pkgs])
+    base = [sys.executable, "-m", "pip", "install", "--upgrade"]
+    # Into the person's own folder, past the marker: the packages land in
+    # ~/Library/Python/3.x or ~/.local and never inside Homebrew's own tree,
+    # which is the arrangement Homebrew itself recommends when the rule is
+    # waived. `--break-system-packages` is pip 23 and newer, so a plain
+    # `--user` stands behind it for the older ones.
+    mine = ["--user", "--break-system-packages"]
+    tries = ([base + mine + list(pkgs), base + ["--user", *pkgs]]
+             if externally_managed()
+             else [base + list(pkgs), base + mine + list(pkgs),
+                   base + ["--user", *pkgs]])
+    for k, cmd in enumerate(tries):
+        if k:
+            print(tr("\n  …that way was refused. Trying your own folder instead.",
+                     "\n  …так не дали. Пробую в вашу личную папку.") + "\n")
+        if subprocess.call(cmd) == 0:
+            print("-" * 60)
+            see_new_packages()
+            print(tr("Done.", "Готово."))
+            return True
     print("-" * 60)
-    if code == 0:
-        see_new_packages()
-        print(tr("Done.", "Готово."))
-        return True
-    print(tr("It did not work. Check the internet or your access rights.",
-                  "Не получилось. Проверьте интернет или права доступа."))
+    if externally_managed():
+        print(tr("It did not work: this Python does not allow installing into "
+                 "it (PEP 668), and installing into your own folder was "
+                 "refused too. A virtual environment is the way round it:\n"
+                 f"    {sys.executable} -m venv ~/karaoke-venv\n"
+                 f"    ~/karaoke-venv/bin/pip install {' '.join(pkgs)}\n"
+                 "  and then start the program with ~/karaoke-venv/bin/python.",
+                 "Не получилось: этот Python запрещает ставить в себя (PEP 668), "
+                 "а в личную папку тоже не дали. Обойти можно отдельным "
+                 "окружением:\n"
+                 f"    {sys.executable} -m venv ~/karaoke-venv\n"
+                 f"    ~/karaoke-venv/bin/pip install {' '.join(pkgs)}\n"
+                 "  и запускать программу через ~/karaoke-venv/bin/python."))
+    else:
+        print(tr("It did not work. Check the internet or your access rights.",
+                 "Не получилось. Проверьте интернет или права доступа."))
     return False
 
 
@@ -216,6 +285,11 @@ def main() -> int:
 
     print("\n" + "=" * 60)
     print(tr("Setup finished.", "Настройка закончена."))
+    # Whatever installed the libraries is what must start the program: this is
+    # the one fact the launchers cannot work out for themselves.
+    if remember_python():
+        print(tr(f"The program will start on this Python: {sys.executable}",
+                 f"Программа будет запускаться на этом Python: {sys.executable}"))
     if missing:
         print(tr("\nOne thing is still open:", "\nОстался один вопрос:"))
         print("  " + missing)

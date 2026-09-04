@@ -6,6 +6,9 @@ music/
 
 karaoke.zip
 
+# The interpreter the setup installed into — this machine's, not the repo's
+app/.python-path
+
 # Python
 __pycache__/
 *.py[cod]
