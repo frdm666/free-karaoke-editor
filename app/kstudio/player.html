@@ -72,6 +72,18 @@
   /* A word is filled not by a gradient over letters but by a second layer on
      top, clipped by width. Only the width changes, so the browser does not
      redraw the text every frame and the highlight does not flicker. */
+  /* The melody, mapped over the words it belongs to: a bar to a word, standing
+     as high as that word is sung. A map to sing by, not a score — nothing here
+     marks anybody. Only the line being sung carries one; all of them at once
+     would be a thicket, and the strip is out of the flow so no line moves. */
+  .ln{position:relative}
+  .mel{position:absolute; left:0; right:0; bottom:100%; height:2.1em;
+       opacity:0; transition:opacity .25s; pointer-events:none}
+  .ln.cur .mel{opacity:.92}
+  .mel i{position:absolute; height:3px; border-radius:2px;
+         background:var(--dim); transition:background .12s}
+  .mel i.on{background:var(--accent)}
+  .ln.v2 .mel i.on{background:var(--accent-2)}
   .ln .w{position:relative; display:inline-block; white-space:pre}
   .ln .w .hl{
     position:absolute; left:0; top:0; width:0; overflow:hidden; white-space:pre;
@@ -538,8 +550,59 @@ function build(){
     scroll.appendChild(el);
     // The “original sings” tag is not a word, there is nothing to highlight.
     const spans = [...el.children].filter(e => e.classList.contains("w"));
-    lineEls.push({el, pips, dots: [...pips.children], spans,
+    // A bar for every word whose pitch was measured. Words with nothing
+    // measurable in them get none: a guessed note is one a singer believes.
+    let mel = null, bars = [];
+    if (ln.words.some(w => typeof w.n === "number")){
+      mel = document.createElement("div");
+      mel.className = "mel";
+      ln.words.forEach(w => {
+        const b = typeof w.n === "number" ? document.createElement("i") : null;
+        if (b) mel.appendChild(b);
+        bars.push(b);
+      });
+      el.appendChild(mel);
+    }
+    lineEls.push({el, pips, dots: [...pips.children], spans, mel, bars,
                   hls: spans.map(s => s.firstChild)});
+  });
+  // A bar takes its place from the word it stands over, and that is not known
+  // until the browser has laid the line out — so this comes last, never first.
+  layMelody();
+}
+
+/* The melody is placed after the words are laid out, because a bar takes its
+   left and its width from the word it stands over — and that is not known
+   until the browser has arranged the line. The range is the whole song's, so a
+   line that rises looks like it rises; a song that barely moves is still given
+   an octave, or every bar would sit at the top of the strip. */
+let noteLo = null, noteHi = null;
+(function noteRange(){
+  const heard = [];
+  lines.forEach(ln => (ln.words || []).forEach(w => {
+    if (typeof w.n === "number") heard.push(w.n);
+  }));
+  if (!heard.length) return;
+  noteLo = Math.min(...heard); noteHi = Math.max(...heard);
+  if (noteHi - noteLo < 12){
+    const mid = (noteHi + noteLo) / 2;
+    noteLo = mid - 6; noteHi = mid + 6;
+  }
+})();
+function layMelody(){
+  if (noteLo === null) return;
+  const span = Math.max(noteHi - noteLo, 1e-6);
+  lineEls.forEach((L, i) => {
+    if (!L.mel) return;
+    const top = L.mel.clientHeight || 1;
+    lines[i].words.forEach((w, j) => {
+      const b = L.bars[j], sp = L.spans[j];
+      if (!b || !sp) return;
+      const frac = Math.min(Math.max((w.n - noteLo) / span, 0), 1);
+      b.style.left = sp.offsetLeft + "px";
+      b.style.width = Math.max(sp.offsetWidth - 2, 3) + "px";
+      b.style.top = ((1 - frac) * (top - 3)).toFixed(1) + "px";
+    });
   });
 }
 
@@ -589,7 +652,10 @@ function tick(){
         + (lines[i].keep ? " keep" : "")
         + (duo && act.has(i) ? " duo" : "")
         + (act.has(i) ? " cur" : i < idx ? " done" : i === idx + 1 ? " next" : "");
-      if (i !== idx || tapping) L.hls.forEach(h => { h.style.width = "0"; });
+      if (i !== idx || tapping){
+        L.hls.forEach(h => { h.style.width = "0"; });
+        if (L.bars) L.bars.forEach(b => b && b.classList.remove("on"));
+      }
     });
     curIdx = idx;
     wasDuo = duo;
@@ -624,6 +690,12 @@ function tick(){
       const p = w.d > 0 ? clamp((t - w.t) / w.d, 0, 1) : (t >= w.t ? 1 : 0);
       const want = p >= 1 ? "100%" : (p <= 0 ? "0px" : (p * 100).toFixed(1) + "%");
       if (hl.style.width !== want) hl.style.width = want;   // write only on change
+      // the bar over the word follows it: sung is lit, ahead is not
+      const b = L.bars && L.bars[j];
+      if (b){
+        const on = p >= 1;
+        if (b.classList.contains("on") !== on) b.classList.toggle("on", on);
+      }
     }
   }
 
@@ -1335,7 +1407,7 @@ booted = true;
 // Edits from a previous session live in the browser while the file itself has
 // none — so the button is highlighted at once, not on the next move.
 if (hadStored) markUnsaved(true);
-window.addEventListener("resize", () => centerLine(curIdx));
+window.addEventListener("resize", () => { centerLine(curIdx); layMelody(); });
 raf = requestAnimationFrame(tick);
 })();
 </script>

@@ -138,6 +138,10 @@ class Word:
     prob: Optional[float] = None
     # a syllable of the word before it: timed on its own, read as one word
     glue: bool = False
+    # How high the word is sung, as a MIDI number, when it could be measured
+    # at all. None is a real answer here and must survive being saved: a word
+    # nobody could measure is not a word at middle C.
+    note: Optional[int] = None
 
     def __post_init__(self):
         if not self.syllables:
@@ -152,6 +156,8 @@ class Word:
             out["p"] = round(self.prob, 3)
         if self.glue:
             out["g"] = True
+        if self.note is not None:
+            out["n"] = int(self.note)
         return out
 
 

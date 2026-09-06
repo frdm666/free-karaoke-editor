@@ -1688,6 +1688,38 @@ def main():
               and song_lines[0]["words"][1]["n"] == 60,
               [w.get("n") for w in song_lines[0]["words"]])
 
+    # A measured note has to survive being saved and read back, or the page and
+    # the video — both of which rebuild the words from the record — would draw
+    # nothing while the record swore the notes were there.
+    keep_l = L.parse("the road goes up")
+    tune = [60, 62, 64, 67][:len(keep_l.lines[0].words)]
+    for k, (w, n) in enumerate(zip(keep_l.lines[0].words, tune)):
+        w.start, w.end = 1.0 + k * 0.5, 1.5 + k * 0.5
+        w.note = n
+    keep_l.lines[0].start, keep_l.lines[0].end = 1.0, 3.0
+    saved = [ln.to_json() for ln in keep_l.lines]
+    check("a note is written into the record",
+          [w.get("n") for w in saved[0]["words"]] == tune,
+          [w.get("n") for w in saved[0]["words"]])
+    import importlib.util as _iu
+    _app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _sp2 = _iu.spec_from_file_location(
+        "studio_mod", os.path.join(_app_dir, "studio.py"))
+    _st = _iu.module_from_spec(_sp2)
+    _sp2.loader.exec_module(_st)
+    round_trip = _st._lyrics_from({"lines": saved})
+    check("and read back from it",
+          [w.note for w in round_trip.lines[0].words] == tune,
+          [w.note for w in round_trip.lines[0].words])
+    page_notes = os.path.join(tmp, "notes_page.html")
+    B.build_html(page_notes, keep_l, 20.0, {}, "energy", embed=False, title="N")
+    pay_n = B.read_payload(page_notes)
+    check("and it reaches the page the singer opens",
+          [w.get("n") for w in pay_n["data"]["lines"][0]["words"]] == tune,
+          [w.get("n") for w in pay_n["data"]["lines"][0]["words"]])
+    check("the page knows how to draw a melody at all",
+          ".mel{" in open(page_notes, encoding="utf-8").read())
+
     print("\nThe singing games get real notes, or none at all")
     from kstudio import interop as IO3
     us = IO3.ultrastar_text({"title": "T", "lines": [{"words": [
