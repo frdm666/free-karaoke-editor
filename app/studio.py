@@ -623,7 +623,8 @@ class Handler(BaseHTTPRequestHandler):
                                     title=body.get("title"),
                                     artist=body.get("artist"),
                                     cover_dark=body.get("coverDark"),
-                                    grid=body.get("grid"))
+                                    grid=body.get("grid"),
+                                    dots_long=body.get("dotsLong"))
                 return self._json({"ok": True, "problems": P.problems(data)})
 
             m = re.match(r"^/api/project/([^/]+)/cover$", path)
@@ -1458,7 +1459,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
                                   if data.get("coverBg") else None),
-                     grid=data.get("grid"))
+                     grid=data.get("grid"),
+                     dots_long=bool(data.get("dotsLong")))
         log(tr(f"Done: {out}", f"Готово: {out}"))
         return {"kind": "html", "path": out}
 
@@ -1517,7 +1519,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
                                   if data.get("coverBg") else None),
-                     grid=data.get("grid"))
+                     grid=data.get("grid"),
+                     dots_long=bool(data.get("dotsLong")))
         out = os.path.join(out_dir, base + ".mp4")
 
         class Args:
@@ -1722,7 +1725,8 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
                      cover_paths=([os.path.join(folder, n)
                                    for n in data.get("coverSet") or []]
                                   if data.get("coverBg") else None),
-                     grid=data.get("grid"))
+                     grid=data.get("grid"),
+                     dots_long=bool(data.get("dotsLong")))
         payload = B.read_payload(page)
 
         class Args:

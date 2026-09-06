@@ -459,6 +459,11 @@ does not catch you outside the bar. It is drawn from the tempo you gave it and
 knows nothing of the music, so a song with living drums will drift away from
 it.
 
+Three guide dots count the seconds before a line arrives. A wait long enough
+gets the panel at the top of the frame instead — the seconds and a bar — so
+one pause is not counted twice over; **`dots on long waits`** gives you both
+where you want both.
+
 The timeline zooms down to half a second across, which is close enough to
 place a word by eye. And **holding Alt while dragging** puts a line exactly
 where your hand puts it — the magnet that pulls to the start of a phrase, or

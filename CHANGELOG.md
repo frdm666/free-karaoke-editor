@@ -7,6 +7,20 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.49.0
+
+**One pause is counted down once.** The three guide dots count the seconds
+before a line, and a wait long enough also gets the panel at the top with the
+seconds and the bar. Over the same pause both said the same thing at once and
+pulled the eye two ways. The dots stand down where the panel is already
+counting; a checkbox — “dots on long waits” — brings them back for anybody who
+wants both. Short gaps are counted down exactly as before: there is no panel
+there to clash with.
+
+The number that decides how long a wait must be to earn that panel was written
+into the middle of the drawing and named nowhere, which is how two countdowns
+came to stand over one pause without anybody choosing it. It has a name now.
+
 ## 4.48.0
 
 **The words now know how high they are sung, not only when.** The pitch is

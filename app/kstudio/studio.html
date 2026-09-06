@@ -270,6 +270,11 @@
             background:var(--card); border:1px solid var(--line);
             border-radius:6px; padding:2px 4px}
   .gridknob b{color:var(--dim)}
+  #gridMore{display:flex}
+  /* Hidden on purpose, and everything inside it with it: a button whose parent
+     is not drawn still reports a display of its own, and reads to anything
+     measuring the toolbar as a visible button squeezed to nothing. */
+  #gridMore.hide, #gridMore.hide *{display:none}
   .darkknob{display:flex; align-items:center; gap:6px; font-size:0.7812rem;
     color:var(--muted); padding-left:9px; border-left:1px solid var(--line);
     flex:none; white-space:nowrap}
@@ -688,6 +693,10 @@
       <span class="gridknob" id="grpGrid" data-tt="gridHint"
             title="A beat grid over the timeline: lines snap to it">
         <label class="chk"><input type="checkbox" id="chkGrid"> <b data-t="gridOn">♩ Grid</b></label>
+        <!-- The tempo and its settings only matter once the grid is on. They
+             are kept out of the way until then: a toolbar row that wraps costs
+             the Check panel its height, and this is the crowded row. -->
+        <span id="gridMore" class="hide" style="align-items:center; gap:5px">
         <input type="number" id="nBpm" min="20" max="300" step="0.1" value="120"
                title="Beats per minute"><b>BPM</b>
         <button id="btnBeatOne" data-t="beatOne"
@@ -695,9 +704,7 @@
         <button id="btnTapTempo" data-t="tapTempo"
                 title="Tap in time with the song, four taps or more">⇥ Tap</button>
         <label class="chk"><input type="checkbox" id="chkSixteen"> <span data-t="sixteenths">16ths</span></label>
-        <label class="chk" data-tt="pulseHint"
-               title="Show the beat in the video as four quiet dots in the corner"><input
-               type="checkbox" id="chkPulse"> <span data-t="pulseOn">pulse in the video</span></label>
+        </span>
       </span>
       <span class="sp" style="flex:1"></span>
       <span id="selNote" data-t="noLine">no line selected</span>
@@ -751,6 +758,15 @@
         <b>🌗</b><input type="range" id="rCoverDark" min="0" max="95" step="1"
         value="66"><input type="number" id="nCoverDark" min="0" max="95"
         step="1" value="66"><b>%</b></span>
+      <!-- Both are about what the video shows, and that is this row, not the
+           row about the timeline. Crowding them in beside the grid pushed the
+           toolbar onto another line and took the height from the Check list. -->
+      <label class="chk" data-tt="pulseHint"
+             title="Show the beat in the video as four quiet dots in the corner"><input
+             type="checkbox" id="chkPulse"> <span data-t="pulseOn">pulse in the video</span></label>
+      <label class="chk" data-tt="dotsLongHint"
+             title="Let the three guide dots count down long waits too, beside the panel that already counts them"><input
+             type="checkbox" id="chkDotsLong"> <span data-t="dotsLongOn">dots on long waits</span></label>
       <button id="btnClipBg" data-tt="backdropHint" data-t="backdropBtn"
               title="A clip behind the lyrics: a file or a link, blurred to a slow field of colour">🎞 Clip behind</button>
       <button id="btnClipBgOff" class="hide" data-tt="backdropOffHint" title="Back to the still backdrop">🎞✕</button>

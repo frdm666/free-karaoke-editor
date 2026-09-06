@@ -1271,7 +1271,11 @@ def main():
           m and float(m.group(1)) >= 10.0, m.group(1) if m else "not found")
     vid = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "tools", "video.py"), encoding="utf-8").read()
-    m2 = re.search(r"if gap >= ([\d.]+):", vid)
+    # The video used to carry this number loose in the middle of the drawing,
+    # where nothing could compare it with the studio's — which is how the dots
+    # and the panel came to count the same pause. It has a name now, and the
+    # name is what is read.
+    m2 = re.search(r"WAIT_MIN_GAP = ([\d.]+)", vid)
     check("and the video says the same", m2 and float(m2.group(1)) >= 10.0,
           m2.group(1) if m2 else "not found")
 

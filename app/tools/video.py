@@ -90,6 +90,11 @@ def edged(font):
 # A wait shorter than this is not counted down: it is a breath between lines,
 # and three dots under a line being sung say nothing anyone needs.
 PIP_MIN_GAP = 2.5
+# From here a wait is long enough for the countdown at the top of the frame —
+# the one with the seconds and the bar. Below it, a wait gets only the three
+# dots. The number was written into the middle of the drawing twice and named
+# nowhere, which is how two countdowns came to stand over the same pause.
+WAIT_MIN_GAP = 10.0
 # How long the last line stays after the song has been sung. Long enough to
 # let go of the note, short enough not to look like a frozen picture.
 END_HOLD = 5.0
@@ -724,6 +729,9 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                 on_progress(row)
     D = payload["data"]
     lines = D["lines"]
+    # Whether the three dots also count down a wait that already has the panel
+    # at the top counting it. Off by default: one pause, one countdown.
+    dots_long = bool(payload.get("dotsLong"))
     # The range the melody is drawn across, taken from the whole song so a
     # rising line looks like it rises. A song that barely moves is still given
     # an octave, or every bar would sit at the top of the map.
@@ -1254,7 +1262,11 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
 
             gap = lines[n1]["start"] - (lines[idx]["end"] if idx >= 0 else 0)
             left = lines[n1]["start"] - t
-            if not singing and gap > PIP_MIN_GAP:
+            # Two countdowns over one pause say the same thing twice and
+            # fight for the eye. So on a wait long enough for the panel at the
+            # top, the dots stand down — unless the singer asked for both.
+            if (not singing and gap > PIP_MIN_GAP
+                    and (dots_long or gap < WAIT_MIN_GAP)):
                 dots(max((y_main + y_next) // 2 + off,
                          duo_bottom + int(H * 0.018)), pips_lit(gap, left))
 
@@ -1271,7 +1283,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             gap = (nxt["start"] - prev_end) if nxt else (duration - prev_end)
             # Ten seconds, as in the program itself: a shorter gap is a
             # breath between lines, and counting it down is noise.
-            if gap >= 10.0:
+            if gap >= WAIT_MIN_GAP:
                 left = (nxt["start"] if nxt else duration) - t
                 # The pill is built around the text, and the text sits in its
                 # centre — horizontally and vertically.

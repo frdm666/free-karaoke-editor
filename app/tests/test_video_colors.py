@@ -412,6 +412,75 @@ def main():
     check("the picture behind is bright, so the ring earned it",
           open_l > 120, f"{open_l:.0f} of 255")
 
+    print("\nOne pause, one countdown")
+    # The three guide dots count the seconds before a line. A wait long enough
+    # also gets the panel at the top with the seconds and the bar — and both
+    # over the same pause say the same thing twice and fight for the eye. So
+    # the dots stand down there, unless the singer asks for both.
+    wait_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                 "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                 "data": {"title": "Waits", "duration": 30.0, "lines": [
+        {"text": "a short opening line", "start": 1.0, "end": 4.0, "voice": 1,
+         "words": [{"w": w, "t": 1.0 + i * 0.75, "d": 0.75, "s": 1}
+                   for i, w in enumerate("a short opening line".split())]},
+        {"text": "and one much later on", "start": 18.0, "end": 22.0, "voice": 1,
+         "words": [{"w": w, "t": 18.0 + i * 0.8, "d": 0.8, "s": 1}
+                   for i, w in enumerate("and one much later on".split())]}]}}
+    wav_w = tone(os.path.join(tmp, "w2.wav"), 220.0, 30.0)
+
+    def wait_frame(both):
+        class AW:
+            width, height, fps, crf = 800, 450, 10, 30
+            preset, font, timings = "ultrafast", None, None
+            start, seconds, audio = 0.0, 0.0, "minus"
+            intro = False
+        a = AW(); a.still = 16.5          # a fourteen-second wait, 1.5 s to go
+        a.output = os.path.join(tmp, f"wait-{int(both)}.png")
+        song = dict(wait_song); song["dotsLong"] = both
+        video.render(song, wav_w, a.output, a)
+        return Image.open(a.output).convert("RGB")
+
+    quiet_wait, busy_wait = wait_frame(False), wait_frame(True)
+    from PIL import ImageChops as _IC
+    gap_diff = _IC.difference(quiet_wait, busy_wait)
+    changed = sum(1 for p in gap_diff.getdata() if sum(p) > 24)
+    where = gap_diff.getbbox()
+    check("asking for both really adds something", changed > 40, changed)
+    Ww, Hw = quiet_wait.size
+    check("and it is the dots, between the seats, not somewhere else",
+          where is not None
+          and Hw * 0.45 < (where[1] + where[3]) / 2 < Hw * 0.62
+          and Ww * 0.40 < (where[0] + where[2]) / 2 < Ww * 0.60,
+          where)
+    # …while a short gap gets its dots either way: there is no panel to clash
+    # with, and a line arriving in three seconds still wants counting in.
+    short_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                  "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                  "data": {"title": "Short", "duration": 20.0, "lines": [
+        {"text": "one line here", "start": 1.0, "end": 4.0, "voice": 1,
+         "words": [{"w": w, "t": 1.0 + i, "d": 1.0, "s": 1}
+                   for i, w in enumerate("one line here".split())]},
+        {"text": "another one soon", "start": 8.0, "end": 11.0, "voice": 1,
+         "words": [{"w": w, "t": 8.0 + i, "d": 1.0, "s": 1}
+                   for i, w in enumerate("another one soon".split())]}]}}
+
+    def short_frame(both):
+        class AS2:
+            width, height, fps, crf = 800, 450, 10, 30
+            preset, font, timings = "ultrafast", None, None
+            start, seconds, audio = 0.0, 0.0, "minus"
+            intro = False
+        a = AS2(); a.still = 6.5          # a four-second gap, 1.5 s to go
+        a.output = os.path.join(tmp, f"short-{int(both)}.png")
+        song = dict(short_song); song["dotsLong"] = both
+        video.render(song, tone(os.path.join(tmp, "w3.wav"), 220.0, 20.0),
+                     a.output, a)
+        return Image.open(a.output).convert("RGB")
+
+    same = _IC.difference(short_frame(False), short_frame(True))
+    check("a short gap is counted down whatever the choice says",
+          same.getbbox() is None, same.getbbox())
+
     print("\nThe beat, shown as a pulse in the corner")
     # A song that keeps one tempo can show it: four dots along the bottom, one
     # to a beat of the bar. It must read as a pulse and not a row of lamps —

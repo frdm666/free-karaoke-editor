@@ -368,6 +368,11 @@ const STR = {
     tapTempo: "\u21e5 Tap",
     sixteenths: "16ths",
     pulseOn: "pulse in the video",
+    dotsLongOn: "dots on long waits",
+    dotsLongHint: "The three guide dots count down the seconds before a line. "
+      + "On a wait long enough for the panel at the top of the frame they "
+      + "stand down, so one pause is not counted twice over. Tick this for "
+      + "both at once.",
     pulseHint: "Show the beat in the video: four quiet dots in the bottom "
       + "corner, one to a beat of the bar, so a singer can see where the bar "
       + "is without anything coming between them and the words. It is drawn "
@@ -796,6 +801,11 @@ const STR = {
     tapTempo: "\u21e5 Отстучать",
     sixteenths: "16-е",
     pulseOn: "пульс в ролике",
+    dotsLongOn: "точки и на долгих паузах",
+    dotsLongHint: "Три точки отсчитывают секунды перед строкой. На паузе, "
+      + "достаточно длинной для таблички вверху кадра, они уступают ей место, "
+      + "чтобы одна пауза не отсчитывалась дважды. Поставьте галку, если "
+      + "нужно и то, и другое.",
     pulseHint: "Показывать долю в ролике: четыре тихие точки в нижнем углу, "
       + "по одной на долю такта, чтобы певец видел, где такт, и между ним и "
       + "словами при этом ничего не стояло. Рисуется по набранному вами "
@@ -1744,6 +1754,7 @@ async function openProject(id){
           beat0: +gsav.beat0 || 0, sub: gsav.sub === 4 ? 4 : 1,
           pulse: !!gsav.pulse};
   showGrid();
+  $("chkDotsLong").checked = !!data.dotsLong;
   colors = (Array.isArray(data.colors) && data.colors.length === 2)
     ? data.colors.slice() : ["#4de1ff", "#ff8ad1"];
   theme = (Array.isArray(data.theme) && data.theme.length === 2)
@@ -2457,7 +2468,9 @@ async function saveNow(){
        keepMarks: $("chkKeepMarks") ? $("chkKeepMarks").checked : true,
        checkOff, title: songName, artist: songArtist,
        coverDark: (data && data.coverDark != null) ? data.coverDark : undefined,
-       grid: (data && data.grid) ? data.grid : undefined});
+       grid: (data && data.grid) ? data.grid : undefined,
+       dotsLong: (data && data.dotsLong !== undefined)
+                 ? !!data.dotsLong : undefined});
     showProblems(r.problems);
     saveState("ok", T.savedOk);
   }catch(e){
@@ -3560,6 +3573,8 @@ function nearestBeat(t){
 }
 function showGrid(){
   $("chkGrid").checked = !!grid.on;
+  // the tempo and its settings appear with the grid and go away with it
+  $("gridMore").classList.toggle("hide", !grid.on);
   $("chkSixteen").checked = grid.sub === 4;
   $("chkPulse").checked = !!grid.pulse;
   if (document.activeElement !== $("nBpm")) $("nBpm").value = grid.bpm;
@@ -3572,13 +3587,23 @@ function saveGrid(){
   drawWave(); drawBlocks();
 }
 $("chkGrid").addEventListener("change", () => {
-  grid.on = $("chkGrid").checked; saveGrid();
+  grid.on = $("chkGrid").checked;
+  showGrid();                 // the tempo and its settings come with it
+  saveGrid();
 });
 $("chkSixteen").addEventListener("change", () => {
   grid.sub = $("chkSixteen").checked ? 4 : 1; saveGrid();
 });
 // The pulse is for the video, not for the window: a person can work with the
 // grid on the timeline and want nothing of it in the clip, or the other way.
+// Two countdowns over one pause say the same thing twice. The dots stand down
+// on a wait the panel at the top is already counting — unless asked otherwise.
+$("chkDotsLong").addEventListener("change", () => {
+  if (!data) return;
+  data.dotsLong = $("chkDotsLong").checked;
+  touched();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+});
 $("chkPulse").addEventListener("change", () => {
   grid.pulse = $("chkPulse").checked;
   saveGrid();

@@ -125,7 +125,8 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
                cover_path: Optional[str] = None,
                cover_dark: Optional[int] = None,
                cover_paths: Optional[list] = None,
-               grid: Optional[dict] = None) -> str:
+               grid: Optional[dict] = None,
+               dots_long: bool = False) -> str:
     """tracks: {\'mix\'|\'instrumental\'|\'vocals\': (path, mime)} → path to the HTML."""
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
@@ -173,6 +174,10 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
         "grid": ({"bpm": max(20.0, min(300.0, float(grid.get("bpm") or 120))),
                   "beat0": max(0.0, float(grid.get("beat0") or 0.0))}
                  if isinstance(grid, dict) and grid.get("pulse") else None),
+        # Whether the three guide dots also count down a wait that already has
+        # the panel at the top counting it. One pause, one countdown, unless
+        # the singer says otherwise.
+        "dotsLong": bool(dots_long),
         "engineLabel": ENGINE_LABEL.get(engine, engine),
         "audio": audio,
         "data": {
