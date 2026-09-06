@@ -906,6 +906,9 @@ def realign_part(folder: str, opts: dict, log) -> dict:
                             isolated=bool(tracks.get("vocals")), skip=outside)
 
     fresh = [ln.to_json() for ln in piece.lines]
+    if tracks.get("vocals"):
+        from kstudio import pitch as PI
+        PI.put_notes(fresh, os.path.join(folder, tracks["vocals"]), log)
     moved = 0
     for k, got in enumerate(fresh):
         old = lines[a + k]
@@ -999,6 +1002,9 @@ def realign(folder: str, opts: dict, log) -> dict:
                           isolated=bool((data.get("tracks") or {}).get("vocals")),
                           skip=holes)
     fresh = [ln.to_json() for ln in lyr.lines]
+    if (data.get("tracks") or {}).get("vocals"):
+        from kstudio import pitch as PI
+        PI.put_notes(fresh, os.path.join(folder, data["tracks"]["vocals"]), log)
     # A line put right by hand outweighs anything a model returns for it.
     P.keep_locked(data.get("lines") or [], fresh, log)
     data["lines"] = fresh

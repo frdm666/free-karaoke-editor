@@ -495,6 +495,12 @@ longer a fixed number either — the band where the words stand is measured on
 every field, and the frame clamps down the instant a cut brings something
 bright under the text, letting go slowly afterwards. `🎞✕` takes it away.
 
+When the song has a separated vocal, the words are measured for pitch as
+well as time, and the video draws the melody: a bar over each word, as high as
+that word is sung, lighting up with it. It is a map to sing by, not a score —
+nothing here marks anybody. Words the measurement could not reach carry no bar,
+because a guessed note is one a singer would believe.
+
 **`⇪`** holds the other ways out: an UltraStar file for the singing games,
 `.ass` subtitles with a word-by-word karaoke sweep, and **`⇩ Pack`** — the
 whole song in one `.karaoke.zip` to carry to another computer, which “Open a

@@ -7,6 +7,30 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.48.0
+
+**The words now know how high they are sung, not only when.** The pitch is
+measured from the singer's own separated track by how the sound repeats
+itself — no neural net, and nothing invented: a word with nothing measurable
+in it keeps no note at all, because a wrong note on a screen is one somebody
+will believe and sing.
+
+**So the video draws the melody.** A bar over each word, standing as high as
+that word is sung, lighting up with it as the line is sung through. The shape
+on the screen is the shape of the tune, and a singer can see where to take
+their voice instead of guessing at it. Nothing is scored and nobody is
+marked — it is a map, not a mark.
+
+**And the UltraStar file carries real notes.** Every word used to leave as
+freestyle, shown and timed but never scored, because nothing here measured a
+pitch. Measured words now leave as notes the singing games can score; words
+nobody could measure stay freestyle, which is the honest answer rather than a
+plausible one.
+
+It wants the separated vocal — over a whole mix the guitars answer instead of
+the singer — and numpy, which a song's worth of arithmetic needs. Without
+either, a song simply has no notes and everything else goes on as before.
+
 ## 4.47.1
 
 **A bare “[3:10-3:50]” went back to meaning what it always meant.** On a line

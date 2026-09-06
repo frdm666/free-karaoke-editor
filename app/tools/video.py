@@ -51,6 +51,14 @@ COL_PIP = (52, 58, 82)          # guide dots between lines
 # does not care what is behind it.
 COL_EDGE = (5, 6, 12)           # the outline under every letter
 SCRIM = 0.42                    # how deep the band under the words goes
+# The melody, drawn above the words it belongs to. A bar to a word, placed by
+# how high it is sung — so a singer sees where to take their voice instead of
+# guessing at it. Nothing is scored and nothing is judged: it is a map, not a
+# mark.
+NOTE_BAND = 0.075               # how much of the frame's height the map takes
+NOTE_GAP = 0.016                # and how far it stands above the line
+NOTE_THICK = 0.0075             # a bar's own thickness
+NOTE_SPREAD = 12                # the fewest semitones the map is drawn across
 
 # A clip standing behind the lyrics is not there to be watched — it is there
 # to move a little colour. So it is taken small and blurred into a field.
@@ -716,6 +724,18 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                 on_progress(row)
     D = payload["data"]
     lines = D["lines"]
+    # The range the melody is drawn across, taken from the whole song so a
+    # rising line looks like it rises. A song that barely moves is still given
+    # an octave, or every bar would sit at the top of the map.
+    _heard = [w["n"] for ln in lines for w in (ln.get("words") or [])
+              if isinstance(w.get("n"), (int, float))]
+    if _heard:
+        note_lo, note_hi = float(min(_heard)), float(max(_heard))
+        if note_hi - note_lo < NOTE_SPREAD:
+            _mid = (note_hi + note_lo) / 2.0
+            note_lo, note_hi = _mid - NOTE_SPREAD / 2.0, _mid + NOTE_SPREAD / 2.0
+    else:
+        note_lo = note_hi = None
     if not lines:
         raise SystemExit(tr("The page has no lyrics.", "В странице нет текста."))
     duration = AU.duration(audio_wav)
@@ -823,6 +843,42 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             return
         mask = img.getchannel("A").point(lambda v: int(v * alpha))
         frame.paste(img, pos, mask)
+
+    def draw_notes(d, pic, line, t, y_line, alpha=1.0):
+        """The melody of this line, mapped above it — a bar to a word.
+
+        A bar stands over the word it belongs to and as high as the word is
+        sung, so the shape on the screen is the shape of the tune. Words the
+        measurement could not reach carry no bar at all rather than a guessed
+        one. A line that wrapped onto two rows is left alone: there is one
+        strip of room above it, and two rows of words to put in it.
+        """
+        if note_lo is None or alpha <= 0.02:
+            return
+        ws = line.get("words") or []
+        if not ws or len(pic.word_x) < len(ws):
+            return
+        if len(set(pic.word_row)) > 1:
+            return
+        band = H * NOTE_BAND
+        top = y_line - H * NOTE_GAP - band
+        if top < H * 0.02:
+            return
+        thick = max(2, int(H * NOTE_THICK))
+        span = max(note_hi - note_lo, 1e-6)
+        hot = COL_HOT2 if line.get("voice") == 2 else COL_HOT
+        for i, w in enumerate(ws):
+            n = w.get("n")
+            if not isinstance(n, (int, float)):
+                continue
+            x0 = pic.word_x[i]
+            x1 = x0 + max(pic.word_w[i], 3)
+            frac = (float(n) - note_lo) / span
+            y = top + (1.0 - min(max(frac, 0.0), 1.0)) * (band - thick)
+            done = t >= (w.get("t") or 0) + (w.get("d") or 0)
+            col = _mix(BG_TOP, hot if done else COL_DIM,
+                       (0.85 if done else 0.45) * alpha)
+            d.rectangle([x0, y, x1, y + thick], fill=col)
 
     def draw_queue(frame, n1, duo=-1, off=0, alpha=1.0):
         """The line coming next, and the one after it fainter still — the
@@ -1165,6 +1221,8 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                 for bx in pic.hot_boxes(lines[j], t):
                     piece = pic.hot.crop(bx)
                     paste_faded(frame, piece, (bx[0], y_j + bx[1]), a_j)
+                if k == 0:
+                    draw_notes(d, pic, lines[j], t, y_j, a_j)
                 if k == 0 and lines[j].get("section"):
                     d.text((margin, y_j - int(H * 0.055)),
                            lines[j]["section"].upper(), font=small,

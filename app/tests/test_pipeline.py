@@ -1647,6 +1647,58 @@ def main():
           and all(u.startswith("data:image") for u in pay_cv["covers"]),
           len(pay_cv.get("covers") or []))
 
+    print("\nHow high the voice goes")
+    # The words know when they are sung; this says at what pitch. Measured
+    # from the singer's own track by how the sound repeats itself — no neural
+    # net, and no guessing: a word with nothing measurable in it keeps no note
+    # at all, because a wrong note on the screen is one somebody will believe.
+    from kstudio import pitch as PI
+    if not PI.available():
+        check("numpy is missing, and the program says so instead of guessing",
+              "numpy" in PI.why_not(), PI.why_not())
+    else:
+        import subprocess as _sp
+        notes_wav = os.path.join(tmp, "notes.wav")
+        parts = []
+        for f in (220.0, 261.63, 329.63, 440.0):      # A3 C4 E4 A4
+            parts += ["-f", "lavfi", "-i", f"sine=frequency={f}:duration=1"]
+        _sp.run([AU.ffmpeg(), "-y", "-v", "error", *parts,
+                        "-filter_complex",
+                        "[0:a][1:a][2:a][3:a]concat=n=4:v=0:a=1[a]",
+                        "-map", "[a]", "-ar", "16000", "-ac", "1", notes_wav],
+                       check=True)
+        seq = PI.contour(notes_wav)
+        heard = [PI.note_of(seq, k + 0.2, k + 0.8) for k in range(4)]
+        check("four known notes are measured as those notes",
+              heard == [57, 60, 64, 69], heard)
+        # silence carries no note, and is not given one
+        quiet_wav = os.path.join(tmp, "quiet.wav")
+        _sp.run([AU.ffmpeg(), "-y", "-v", "error", "-f", "lavfi",
+                        "-i", "anullsrc=r=16000:cl=mono", "-t", "2",
+                        quiet_wav], check=True)
+        check("silence is left without a note",
+              PI.note_of(PI.contour(quiet_wav), 0.5, 1.5) is None)
+        # and the words of a song get theirs
+        song_lines = [{"text": "one two", "start": 0.2, "end": 1.8, "words": [
+            {"w": "one", "t": 0.2, "d": 0.6, "s": 1},
+            {"w": "two", "t": 1.2, "d": 0.6, "s": 1}]}]
+        done, total = PI.put_notes(song_lines, notes_wav)
+        check("a word is given the note it is sung on",
+              done == 2 and song_lines[0]["words"][0]["n"] == 57
+              and song_lines[0]["words"][1]["n"] == 60,
+              [w.get("n") for w in song_lines[0]["words"]])
+
+    print("\nThe singing games get real notes, or none at all")
+    from kstudio import interop as IO3
+    us = IO3.ultrastar_text({"title": "T", "lines": [{"words": [
+        {"w": "high", "t": 1.0, "d": 0.5, "n": 72},
+        {"w": "hush", "t": 1.5, "d": 0.5}]}]}, "a.mp3")
+    rows = [r for r in us.splitlines() if r[:1] in (":", "F")]
+    check("a measured word leaves as a note the games can score",
+          rows[0].startswith(": ") and rows[0].split()[3] == "12", rows[0])
+    check("and one nobody measured stays freestyle, not invented",
+          rows[1].startswith("F "), rows[1])
+
     print("\nThe beat grid belongs to the song")
     # A tempo counted once should still be there tomorrow — and nonsense typed
     # into the field must not reach the record.

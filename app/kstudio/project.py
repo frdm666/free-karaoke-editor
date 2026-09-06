@@ -217,6 +217,14 @@ def create(audio_path: str, lyrics_path: str, root: str, *,
             "envelope": envelope,
             "lines": [ln.to_json() for ln in lyr.lines],
         }
+        # How high each word is sung, measured from the singer's own track.
+        # Only from the separated vocal: over a whole mix the guitars answer
+        # instead of the singer, and a wrong note is worse than none, because
+        # somebody will believe it.
+        if tracks.get("vocals"):
+            from . import pitch as PI
+            PI.put_notes(data["lines"],
+                         os.path.join(folder, tracks["vocals"]), log)
         if cover and os.path.isfile(cover):
             shutil.copyfile(cover, os.path.join(folder, "cover.jpg"))
         save(folder, data)

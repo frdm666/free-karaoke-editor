@@ -37,10 +37,15 @@ def _sung_lines(data: Dict) -> List[Dict]:
 def ultrastar_text(data: Dict, audio_name: str) -> str:
     """The song as an UltraStar .txt.
 
-    The words carry no pitch — nothing here measures one — so every note is
-    freestyle (`F`): the games show the words and run the bar without scoring
-    tones that would only be invented. A song with two voices becomes a duet
-    file, the second voice standing in the P2 part.
+    A word whose pitch was measured from the singer's own track leaves as a
+    real note (`:`) at that pitch, and the singing games can score it. A word
+    with nothing measurable in it — a consonant, a whisper, a word the
+    separation lost — stays freestyle (`F`): shown and timed, not scored,
+    because a note nobody measured is a note nobody should be marked against.
+
+    Pitch zero in this format is middle C, so a note is written as its MIDI
+    number less sixty. A song with two voices becomes a duet file, the second
+    voice standing in the P2 part.
     """
     lines = _sung_lines(data)
     if not lines:
@@ -81,7 +86,11 @@ def ultrastar_text(data: Dict, audio_name: str) -> str:
                 # a syllable of the same word carries no space before it —
                 # UltraStar reads them as one word, sung piece by piece
                 text = w["w"] + ("" if nxt is None or nxt.get("g") else " ")
-                rows.append(f"F {start} {length} 0 {text}")
+                note = w.get("n")
+                if note is None:
+                    rows.append(f"F {start} {length} 0 {text}")
+                else:
+                    rows.append(f": {start} {length} {int(note) - 60} {text}")
         return rows
 
     if duet:
