@@ -8,7 +8,7 @@ One of the two was always lying.
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional
+from typing import Dict
 from .i18n import tr
 
 # Sizes for the messages: what matters is whether to wait a second or half an hour.

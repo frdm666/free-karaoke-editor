@@ -1453,20 +1453,7 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
         out = os.path.join(out_dir, base + "_karaoke.html")
         log(tr("Building the standalone page…", "Собираю автономную страницу…"))
         B.build_html(out, lyr, data["duration"], tracks, data.get("engine", ""),
-                     embed=True, title=data.get("title"), artist=data.get("artist"),
-                     colors=data.get("colors"), theme=data.get("theme"),
-                     keep_spans=P.keep_spans(data),
-                     cover_path=(os.path.join(folder, data["cover"])
-                                 if data.get("coverBg") and data.get("cover") else None),
-                     cover_dark=data.get("coverDark"),
-                     cover_paths=([os.path.join(folder, n)
-                                   for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None),
-                     grid=data.get("grid"),
-                     dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False,
-                     trim=data.get("trim"))
+                     embed=True, **_page_opts(data, folder))
         log(tr(f"Done: {out}", f"Готово: {out}"))
         return {"kind": "html", "path": out}
 
@@ -1516,20 +1503,7 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
 
         tmp_html = os.path.join(folder, "_render.html")
         B.build_html(tmp_html, lyr, data["duration"], tracks, data.get("engine", ""),
-                     embed=True, title=data.get("title"), artist=data.get("artist"),
-                     colors=data.get("colors"), theme=data.get("theme"),
-                     keep_spans=P.keep_spans(data),
-                     cover_path=(os.path.join(folder, data["cover"])
-                                 if data.get("coverBg") and data.get("cover") else None),
-                     cover_dark=data.get("coverDark"),
-                     cover_paths=([os.path.join(folder, n)
-                                   for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None),
-                     grid=data.get("grid"),
-                     dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False,
-                     trim=data.get("trim"))
+                     embed=True, **_page_opts(data, folder))
         out = os.path.join(out_dir, base + ".mp4")
 
         class Args:
@@ -1729,20 +1703,7 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
     try:
         page = os.path.join(tmp, "page.html")
         B.build_html(page, _lyrics_from(data), data["duration"], {}, data.get("engine", ""),
-                     embed=False, title=data.get("title"), artist=data.get("artist"),
-                     colors=data.get("colors"), theme=data.get("theme"),
-                     keep_spans=P.keep_spans(data),
-                     cover_path=(os.path.join(folder, data["cover"])
-                                 if data.get("coverBg") and data.get("cover") else None),
-                     cover_dark=data.get("coverDark"),
-                     cover_paths=([os.path.join(folder, n)
-                                   for n in data.get("coverSet") or []]
-                                  if data.get("coverBg") else None),
-                     grid=data.get("grid"),
-                     dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False,
-                     trim=data.get("trim"))
+                     embed=False, **_page_opts(data, folder))
         payload = B.read_payload(page)
 
         class Args:
@@ -1766,6 +1727,36 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
             return f.read()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _page_opts(data: dict, folder: str) -> dict:
+    """Everything a page needs to know about how a song should look.
+
+    Three places build one: the standalone HTML, the video, and the frame
+    preview. Each used to spell this list out in full, so every new setting had
+    to be added in three places and remembered in three places — and a page
+    built from two different ideas of the same song is exactly the sort of
+    difference nobody sees until it is on YouTube.
+    """
+    cover_on = bool(data.get("coverBg"))
+    return {
+        "title": data.get("title"),
+        "artist": data.get("artist"),
+        "colors": data.get("colors"),
+        "theme": data.get("theme"),
+        "keep_spans": P.keep_spans(data),
+        "cover_path": (os.path.join(folder, data["cover"])
+                       if cover_on and data.get("cover") else None),
+        "cover_dark": data.get("coverDark"),
+        "cover_paths": ([os.path.join(folder, n)
+                         for n in data.get("coverSet") or []]
+                        if cover_on else None),
+        "grid": data.get("grid"),
+        "dots_long": bool(data.get("dotsLong")),
+        "melody": bool(data.get("melody")),
+        "holds": data.get("holds") is not False,
+        "trim": data.get("trim"),
+    }
 
 
 def _lyrics_from(data: dict):

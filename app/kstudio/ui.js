@@ -3653,6 +3653,11 @@ $("chkSixteen").addEventListener("change", () => {
    Two presses at the playhead say where it starts and where it stops. The
    recording itself is untouched: the cut is a setting, so tomorrow it can be
    moved or dropped without rebuilding anything. */
+// The open frame follows any edit that changes how it will look. Written out
+// at every such edit, it was ten copies of one thought.
+function refreshStill(){
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+}
 function showCut(){
   const t = data && data.trim;
   const on = !!(t && t.length === 2 && t[1] > t[0]);
@@ -3664,7 +3669,7 @@ function setCut(a, b){
   const lo = Math.max(0, a), hi = Math.min(dur || 0, b);
   data.trim = (hi - lo > 1) ? [lo, hi] : null;
   showCut(); touched();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+  refreshStill();
 }
 $("btnCutFrom").addEventListener("click", () => {
   const t = data && data.trim;
@@ -3679,31 +3684,25 @@ $("btnCutTo").addEventListener("click", () => {
 $("btnCutAll").addEventListener("click", () => {
   if (!data) return;
   data.trim = null; showCut(); touched();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+  refreshStill();
   toast(T.cutGone);
 });
-$("chkHolds").addEventListener("change", () => {
-  if (!data) return;
-  data.holds = $("chkHolds").checked;
-  touched();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
-});
-$("chkMelody").addEventListener("change", () => {
-  if (!data) return;
-  data.melody = $("chkMelody").checked;
-  touched();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
-});
-$("chkDotsLong").addEventListener("change", () => {
-  if (!data) return;
-  data.dotsLong = $("chkDotsLong").checked;
-  touched();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+// Three switches that only say how the video should look. Each was the same
+// five lines with one word changed, which is three chances to get it wrong and
+// three places to remember when a fourth is added.
+[["chkHolds", "holds"], ["chkMelody", "melody"],
+ ["chkDotsLong", "dotsLong"]].forEach(([id, key]) => {
+  $(id).addEventListener("change", () => {
+    if (!data) return;
+    data[key] = $(id).checked;
+    touched();
+    refreshStill();
+  });
 });
 $("chkPulse").addEventListener("change", () => {
   grid.pulse = $("chkPulse").checked;
   saveGrid();
-  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+  refreshStill();
 });
 $("nBpm").addEventListener("input", () => {
   grid.bpm = clamp(+$("nBpm").value || 120, 20, 300); saveGrid();
@@ -4084,7 +4083,7 @@ function setDark(v){
   // The open frame follows, once the hand has settled.
   clearTimeout(stillTimer);
   stillTimer = setTimeout(() => {
-    if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+    refreshStill();
   }, 400);
 }
 $("rCoverDark").addEventListener("input", () => setDark($("rCoverDark").value));
@@ -4135,7 +4134,7 @@ async function takeCover(path, url){
       url ? {url} : {path});
     data.cover = "cover.jpg"; data.coverBg = true;
     refreshCover(); toast(T.coverSet);
-    if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+    refreshStill();
   }catch(e){ toast(e.message); }
 }
 
@@ -4152,7 +4151,7 @@ async function takeBackdrop(path, url){
       url ? {url} : {path});
     data.backdrop = "backdrop.mp4";
     refreshBackdrop(); toast(T.backdropSet);
-    if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+    refreshStill();
   }catch(e){ toast(e.message); }
 }
 function backdropUrlRow(box){
@@ -4185,7 +4184,7 @@ $("btnClipBgOff").addEventListener("click", async () => {
     await api(`/api/project/${encodeURIComponent(pid)}/backdrop`, {off: true});
     data.backdrop = null;
     refreshBackdrop(); toast(T.backdropGone);
-    if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+    refreshStill();
   }catch(e){ toast(e.message); }
 });
 

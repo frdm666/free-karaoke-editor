@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import difflib
 import re
-import sys
 import warnings
 from typing import Callable, Dict, List, Optional
 

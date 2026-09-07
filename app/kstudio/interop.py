@@ -9,7 +9,6 @@ fixed by hand is what leaves the house.
 """
 from __future__ import annotations
 
-import math
 from typing import Dict, List
 
 from .i18n import tr
