@@ -89,6 +89,29 @@ def bpm(env: List[float], dt: float) -> Tuple[Optional[float], float]:
     return round(best_t, 1), round(conf, 2)
 
 
+def runs_below(env: List[float], dt: float, thr: float,
+               least: float) -> List[Dict]:
+    """Stretches where the sound stays under `thr` for at least `least`.
+
+    Two passes wanted this and each carried its own copy: one asking whether a
+    voice is there at all, the other where the song goes quiet. They differ in
+    where the line is drawn and in nothing else, so the line is the argument
+    and the walk is written once.
+    """
+    out, run = [], None
+    for i, v in enumerate(env):
+        if v <= thr:
+            if run is None:
+                run = i
+        else:
+            if run is not None and (i - run) * dt >= least:
+                out.append({"start": round(run * dt, 1), "end": round(i * dt, 1)})
+            run = None
+    if run is not None and (len(env) - run) * dt >= least:
+        out.append({"start": round(run * dt, 1), "end": round(len(env) * dt, 1)})
+    return out
+
+
 def quiet_stretches(env: List[float], dt: float, least: float = 5.0) -> List[Dict]:
     """Long stretches without singing: intro, interlude, solo, tail.
 
@@ -103,18 +126,7 @@ def quiet_stretches(env: List[float], dt: float, least: float = 5.0) -> List[Dic
     floor = ordered[int(len(ordered) * 0.35)]
     thr = max(floor * 1.15, ordered[int(len(ordered) * 0.12)])
 
-    out, run = [], None
-    for i, v in enumerate(env):
-        if v <= thr:
-            if run is None:
-                run = i
-        else:
-            if run is not None and (i - run) * dt >= least:
-                out.append({"start": round(run * dt, 1), "end": round(i * dt, 1)})
-            run = None
-    if run is not None and (len(env) - run) * dt >= least:
-        out.append({"start": round(run * dt, 1), "end": round(len(env) * dt, 1)})
-    return out
+    return runs_below(env, dt, thr, least)
 
 
 def loudness(env: List[float]) -> Dict:

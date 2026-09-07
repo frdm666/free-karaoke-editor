@@ -775,6 +775,30 @@ _MIN_PER_SYLLABLE = 0.07
 _SUNG_PER_SYLLABLE = 0.45
 
 
+def _lay_run(run, lo: float, hi: float, total: int, need: float,
+             more_after: bool) -> int:
+    """Lay a run of lines across [lo, hi], each taking the share its syllables
+    ask for. Returns how many were laid.
+
+    The same seven lines stood in three passes of this file, differing only in
+    what the two ends were called. They are one thing: a run of lines with
+    nowhere of its own to be, given a stretch and shared out by syllable. The
+    run is pushed up against the far end when something follows it, because a
+    pile forms where the aligner lost the text and it found itself again on the
+    line after — so the words belong next to that line, not adrift before it.
+    """
+    span = min(hi - lo, max(_SUNG_PER_SYLLABLE * total, need))
+    base = (hi - span) if more_after else lo
+    acc = 0.0
+    for ln in run:
+        t0 = base + span * acc / total
+        acc += _syl(ln)
+        t1 = base + span * acc / total
+        _spread(ln.words, t0, max(t1 - 0.05, t0 + 0.05))
+        ln.start, ln.end = ln.words[0].start, ln.words[-1].end
+    return len(run)
+
+
 def _syl(ln) -> int:
     return sum(w.syllables for w in ln.words) or 1
 
@@ -923,18 +947,7 @@ def repair_piles(lyrics: Lyrics, duration: float, log: Log = _noop,
         total = sum(_syl(ln) for ln in run)
         # An unhurried sung pace. Wider than the “nobody sings that fast” floor,
         # narrower than the whole gap — the rest of the gap may well be music.
-        span = min(hi - lo, max(_SUNG_PER_SYLLABLE * total, need))
-        # Against the following line when there is one: a pile forms where the
-        # aligner lost the text, and it re-locked at the line after it.
-        base = hi - span if b + 1 < len(lines) else lo
-        acc = 0.0
-        for ln in run:
-            t0 = base + span * acc / total
-            acc += _syl(ln)
-            t1 = base + span * acc / total
-            _spread(ln.words, t0, max(t1 - 0.05, t0 + 0.05))
-            ln.start, ln.end = ln.words[0].start, ln.words[-1].end
-        fixed += len(run)
+        fixed += _lay_run(run, lo, hi, total, need, b + 1 < len(lines))
 
     if fixed:
         log(tr(f"  lines the aligner piled in one spot, spread out: {fixed}",
@@ -985,18 +998,8 @@ def silent_spans(env: List[float], dt: float, least: float = 2.5) -> List[Dict]:
     if peak <= 0:
         return []
     thr = peak * 0.02
-    out, run = [], None
-    for i, v in enumerate(env):
-        if v <= thr:
-            if run is None:
-                run = i
-        else:
-            if run is not None and (i - run) * dt >= least:
-                out.append({"start": round(run * dt, 1), "end": round(i * dt, 1)})
-            run = None
-    if run is not None and (len(env) - run) * dt >= least:
-        out.append({"start": round(run * dt, 1), "end": round(len(env) * dt, 1)})
-    return out
+    from . import report as R
+    return R.runs_below(env, dt, thr, least)
 
 
 def _voiced_windows(lo: float, hi: float, quiet: List[Dict]) -> List[List[float]]:
@@ -1085,16 +1088,8 @@ def repair_silent(lyrics: Lyrics, duration: float, audio_path: str,
             stuck.append((i, j, run[0].start or 0.0))
             i = j + 1
             continue
-        span = min(pick[1] - pick[0], max(_SUNG_PER_SYLLABLE * total, need))
-        base = (pick[1] - span) if j + 1 < len(lines) else pick[0]
-        acc = 0.0
-        for ln in run:
-            t0 = base + span * acc / total
-            acc += _syl(ln)
-            t1 = base + span * acc / total
-            _spread(ln.words, t0, max(t1 - 0.05, t0 + 0.05))
-            ln.start, ln.end = ln.words[0].start, ln.words[-1].end
-        moved += len(run)
+        moved += _lay_run(run, pick[0], pick[1], total, need,
+                          j + 1 < len(lines))
         i = j + 1
 
     if moved:
@@ -1303,16 +1298,8 @@ def enforce_marks(lyrics: Lyrics, skip, duration: float, log: Log = _noop) -> in
                         _absorb(lines, j + 1, got)
                         pick[1] += got
                         borrowed.append((i, j, got))
-        span = min(pick[1] - pick[0], max(_SUNG_PER_SYLLABLE * total, need))
-        base = (pick[1] - span) if j + 1 < len(lines) else pick[0]
-        acc = 0.0
-        for ln in run:
-            t0 = base + span * acc / total
-            acc += _syl(ln)
-            t1 = base + span * acc / total
-            _spread(ln.words, t0, max(t1 - 0.05, t0 + 0.05))
-            ln.start, ln.end = ln.words[0].start, ln.words[-1].end
-            moved += 1
+        moved += _lay_run(run, pick[0], pick[1], total, need,
+                          j + 1 < len(lines))
         i = j + 1
     if moved:
         log(tr(f"  lines forced off the marked stretches: {moved}",
