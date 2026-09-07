@@ -270,6 +270,8 @@
             background:var(--card); border:1px solid var(--line);
             border-radius:6px; padding:2px 4px}
   .gridknob b{color:var(--dim)}
+  .cutknob{display:flex; align-items:center; gap:5px}
+  .cutnote{font-size:0.7188rem; color:var(--accent)}
   #gridMore{display:flex}
   /* Hidden on purpose, and everything inside it with it: a button whose parent
      is not drawn still reports a display of its own, and reads to anything
@@ -783,6 +785,18 @@
       <button id="btnClipBg" data-tt="backdropHint" data-t="backdropBtn"
               title="A clip behind the lyrics: a file or a link, blurred to a slow field of colour">🎞 Clip behind</button>
       <button id="btnClipBgOff" class="hide" data-tt="backdropOffHint" title="Back to the still backdrop">🎞✕</button>
+      <!-- Which piece of the song the singer is given. Two presses at the
+           playhead, and one to undo the whole idea. The recording is not
+           touched: this is a setting, and tomorrow it can be moved. -->
+      <span class="cutknob" id="grpCut">
+        <button id="btnCutFrom" data-tt="cutFromHint" data-t="cutFrom"
+                title="The song starts here for whoever sings it">⟤ from here</button>
+        <button id="btnCutTo" data-tt="cutToHint" data-t="cutTo"
+                title="And ends here">⟥ to here</button>
+        <button id="btnCutAll" class="hide" data-tt="cutAllHint" data-t="cutAll"
+                title="Back to the whole song">⟲ whole song</button>
+        <span id="cutNote" class="cutnote"></span>
+      </span>
       <button id="btnLoop" data-tt="loopHint" data-t="loop"
               title="Play the selected line over and over">↻ Loop</button>
       <button id="btnSnap" data-tt="snapHint" data-t="snapAll"

@@ -7,6 +7,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 from typing import Dict, Optional
 from urllib.parse import quote
 
@@ -117,6 +120,43 @@ def theme_colors(theme):
     return {"bg": bg, "text": text}, fixed
 
 
+def _cut_range(trim, duration: float):
+    """The piece asked for, or None when the whole song is meant.
+
+    A cut shorter than a second is somebody's slip, not an intention, and a
+    pair that covers the whole song is the same as no cut at all.
+    """
+    if not trim:
+        return None
+    try:
+        a, b = float(trim[0]), float(trim[1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return None
+    a = max(0.0, a)
+    b = float(duration) if b <= 0 else min(float(duration), b)
+    if b - a < 1.0:
+        return None
+    if a < 0.01 and b > float(duration) - 0.01:
+        return None
+    return (a, b)
+
+
+def _cut_audio(path: str, a: float, b: float, into: str, name: str) -> str:
+    """One track, cut to [a, b]. Falls back to the whole file if ffmpeg balks.
+
+    Re-encoded rather than copied: copying cuts at the nearest keyframe, which
+    on a compressed track is anywhere up to a second away — and a second is
+    exactly the kind of error nobody notices until the first word is missing.
+    """
+    from . import audio as AU
+    out = os.path.join(into, name + ".mp3")
+    p = subprocess.run([AU.ffmpeg(), "-y", "-v", "error", "-ss", f"{a:.3f}",
+                        "-to", f"{b:.3f}", "-i", path, "-vn",
+                        "-c:a", "libmp3lame", "-q:a", "3", out],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out if p.returncode == 0 and os.path.isfile(out) else path
+
+
 def build_html(out_path: str, lyrics: Lyrics, duration: float,
                tracks: Dict[str, tuple], engine: str = "energy",
                embed: bool = True, title: Optional[str] = None,
@@ -128,24 +168,69 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
                grid: Optional[dict] = None,
                dots_long: bool = False,
                melody: bool = False,
-               holds: bool = True) -> str:
+               holds: bool = True,
+               trim=None) -> str:
     """tracks: {\'mix\'|\'instrumental\'|\'vocals\': (path, mime)} → path to the HTML."""
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
 
+    # A song can hold two minutes of silence, or a hidden track after it, or
+    # begin long before anybody sings. What the singer is given is the part
+    # they marked: the sound is cut to it and every time in the page moves with
+    # the cut, so nobody has to work the same thing out twice. The song itself
+    # is untouched — this is a setting, not a knife.
+    cut = _cut_range(trim, duration)
     audio = {}
+    tmp_cut = tempfile.mkdtemp(prefix="karaoke_trim_") if (cut and embed) else None
     for name, (path, mime) in tracks.items():
         if not path:
             continue
-        audio[name] = _data_uri(path, mime) if embed else _rel(path, out_path)
+        src, use_mime = path, mime
+        if tmp_cut:
+            src = _cut_audio(path, cut[0], cut[1], tmp_cut, name)
+            use_mime = "audio/mpeg"
+        audio[name] = _data_uri(src, use_mime) if embed else _rel(path, out_path)
+    if tmp_cut:
+        # the bytes are already inside the page; the pieces have no life of
+        # their own and should not be left lying about
+        shutil.rmtree(tmp_cut, ignore_errors=True)
+
+    # Everything the page counts in seconds moves with the cut: the lines, the
+    # words inside them, the stretches where the original is kept, and the
+    # length itself. A page whose sound starts at one moment and whose text
+    # believes another is worse than no page.
+    rows = [ln.to_json() for ln in lyrics.lines]
+    spans_out = [[float(a), float(b)] for a, b in (keep_spans or [])]
+    dur_out = float(duration)
+    if cut:
+        lo, hi = cut
+        dur_out = hi - lo
+        kept = []
+        for r in rows:
+            if float(r.get("end") or 0) <= lo or float(r.get("start") or 0) >= hi:
+                continue                      # wholly outside the piece
+            r = dict(r)
+            r["start"] = round(max(float(r.get("start") or 0) - lo, 0.0), 3)
+            r["end"] = round(min(float(r.get("end") or 0) - lo, dur_out), 3)
+            r["words"] = [dict(w, t=round(float(w.get("t") or 0) - lo, 3))
+                          for w in (r.get("words") or [])
+                          if float(w.get("t") or 0) + float(w.get("d") or 0) > lo
+                          and float(w.get("t") or 0) < hi]
+            if r["words"]:
+                kept.append(r)
+        rows = kept
+        spans_out = [[max(a - lo, 0.0), min(b - lo, dur_out)]
+                     for a, b in spans_out if b > lo and a < hi]
 
     title = title or lyrics.title or os.path.splitext(os.path.basename(out_path))[0]
 
     # Key under which edits are kept in the browser. The timings must take part
     # in it: otherwise a rebuilt page with new timing would get the old key and
     # silently pull the old edits over the fresh alignment.
-    sig = "|".join([title, str(round(duration, 1))] +
-                   [f"{ln.start or 0:.2f}" for ln in lyrics.lines])
+    # The cut takes part in the key too, or a page rebuilt from a different
+    # piece of the song would quietly pull in the edits made against the old one.
+    sig = "|".join([title, str(round(dur_out, 1))] +
+                   [f"{float(r.get('start') or 0):.2f}" for r in rows])
     payload = {
         # the player lives inside the page, so updating the program does not
         # change already built files — this mark says which code is inside
@@ -190,13 +275,13 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
         "data": {
             "title": title,
             "artist": artist or lyrics.artist or "",
-            "duration": round(duration, 3),
+            "duration": round(dur_out, 3),
             # Stretches where the original voice is left in: a vocalise or a
             # scream with no words has nothing to sing over, and muting it
             # leaves a hole in the song.
             "keepSpans": [[round(float(a), 3), round(float(b), 3)]
-                          for a, b in (keep_spans or [])],
-            "lines": [ln.to_json() for ln in lyrics.lines],
+                          for a, b in spans_out],
+            "lines": rows,
         },
     }
 

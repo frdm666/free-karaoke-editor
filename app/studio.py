@@ -626,7 +626,8 @@ class Handler(BaseHTTPRequestHandler):
                                     grid=body.get("grid"),
                                     dots_long=body.get("dotsLong"),
                                     melody=body.get("melody"),
-                                    holds=body.get("holds"))
+                                    holds=body.get("holds"),
+                                    trim=body.get("trim"))
                 return self._json({"ok": True, "problems": P.problems(data)})
 
             m = re.match(r"^/api/project/([^/]+)/cover$", path)
@@ -1464,7 +1465,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
                      melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False)
+                     holds=data.get("holds") is not False,
+                     trim=data.get("trim"))
         log(tr(f"Done: {out}", f"Готово: {out}"))
         return {"kind": "html", "path": out}
 
@@ -1526,7 +1528,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
                      melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False)
+                     holds=data.get("holds") is not False,
+                     trim=data.get("trim"))
         out = os.path.join(out_dir, base + ".mp4")
 
         class Args:
@@ -1738,7 +1741,8 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
                      melody=bool(data.get("melody")),
-                     holds=data.get("holds") is not False)
+                     holds=data.get("holds") is not False,
+                     trim=data.get("trim"))
         payload = B.read_payload(page)
 
         class Args:

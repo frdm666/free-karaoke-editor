@@ -329,7 +329,7 @@ def unpack(zip_path: str, root: str) -> str:
 def save_lines(folder: str, lines: List[Dict], colors=None, theme=None,
                no_text=None, keep_marks=None, check_off=None,
                title=None, artist=None, cover_dark=None, grid=None,
-               dots_long=None, melody=None, holds=None) -> Dict:
+               dots_long=None, melody=None, holds=None, trim=None) -> Dict:
     data = load(folder)
     data["lines"] = lines
     if colors:
@@ -347,6 +347,14 @@ def save_lines(folder: str, lines: List[Dict], colors=None, theme=None,
         data["melody"] = bool(melody)
     if holds is not None:
         data["holds"] = bool(holds)
+    if trim is not None:
+        # Two numbers or nothing: the piece of the song the singer is given.
+        # The recording itself is never touched — this can be undone tomorrow.
+        try:
+            a, b = float(trim[0]), float(trim[1])
+            data["trim"] = [max(0.0, a), max(0.0, b)] if b > a else None
+        except (TypeError, ValueError, IndexError, KeyError):
+            data["trim"] = None
     if isinstance(grid, dict):
         # The beat grid belongs to the song, not to the window: a tempo counted
         # once should still be there tomorrow.

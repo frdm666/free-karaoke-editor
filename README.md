@@ -469,6 +469,18 @@ place a word by eye. And **holding Alt while dragging** puts a line exactly
 where your hand puts it — the magnet that pulls to the start of a phrase, or
 to the beat, is a help until the moment it is not.
 
+## Giving out a piece of the song
+
+Some songs hold two minutes of silence, a hidden track behind them, or a
+lead-in nobody sings over. **`⟤ from here`** and **`⟥ to here`** say which
+piece the singer is given: put the playhead where it belongs and press. The
+page and the video are made from that piece — the sound cut to it, every time
+in it moved with the cut — and **`⟲ whole song`** undoes the idea.
+
+The recording is never touched. This is a setting, so it can be moved or
+dropped tomorrow; the project keeps the whole song on disk, which is what
+lets you change your mind.
+
 ## Finding your way around a long song
 
 Above the timeline stands a strip with the whole song on it: the marked

@@ -371,6 +371,16 @@ const STR = {
     sixteenths: "16ths",
     pulseOn: "pulse in the video",
     dotsLongOn: "dots on long waits",
+    cutFrom: "\u27E4 from here", cutTo: "\u27E5 to here",
+    cutAll: "\u27F2 whole song",
+    cutFromHint: "The song starts here for whoever sings it. Two minutes of "
+      + "silence, a hidden track, a long lead-in — none of it has to travel "
+      + "with the karaoke. The recording is untouched: this is a setting, and "
+      + "it can be moved or dropped tomorrow.",
+    cutToHint: "And ends here.",
+    cutAllHint: "Back to the whole song.",
+    cutSet: at => "The song is given as " + at,
+    cutGone: "The whole song again",
     holdsOn: "bar on waits in a line",
     holdsHint: "A pause inside a line — a held note, an answer from the guitar "
       + "— shows itself: a bar grows under the word that will end it, so the "
@@ -816,6 +826,16 @@ const STR = {
     sixteenths: "16-е",
     pulseOn: "пульс в ролике",
     dotsLongOn: "точки и на долгих паузах",
+    cutFrom: "\u27E4 отсюда", cutTo: "\u27E5 досюда",
+    cutAll: "\u27F2 вся песня",
+    cutFromHint: "Отсюда песня начинается для того, кто её поёт. Две минуты "
+      + "тишины, спрятанный трек, длинное вступление — ничему из этого не "
+      + "обязательно ехать вместе с караоке. Запись не трогается: это "
+      + "настройка, её можно подвинуть или снять завтра.",
+    cutToHint: "И досюда кончается.",
+    cutAllHint: "Вернуть песню целиком.",
+    cutSet: at => "Песня отдаётся куском " + at,
+    cutGone: "Снова вся песня",
     holdsOn: "полоска пауз в строке",
     holdsHint: "Пауза внутри строки — тянутая нота, ответ гитары — показывает "
       + "себя: под словом, которое её закончит, растёт полоска, и певец знает, "
@@ -1782,6 +1802,7 @@ async function openProject(id){
   $("chkDotsLong").checked = !!data.dotsLong;
   $("chkMelody").checked = !!data.melody;
   $("chkHolds").checked = data.holds !== false;
+  showCut();
   colors = (Array.isArray(data.colors) && data.colors.length === 2)
     ? data.colors.slice() : ["#4de1ff", "#ff8ad1"];
   theme = (Array.isArray(data.theme) && data.theme.length === 2)
@@ -2499,7 +2520,8 @@ async function saveNow(){
        dotsLong: (data && data.dotsLong !== undefined)
                  ? !!data.dotsLong : undefined,
        melody: (data && data.melody !== undefined) ? !!data.melody : undefined,
-       holds: (data && data.holds !== undefined) ? !!data.holds : undefined});
+       holds: (data && data.holds !== undefined) ? !!data.holds : undefined,
+       trim: (data && data.trim !== undefined) ? data.trim : undefined});
     showProblems(r.problems);
     saveState("ok", T.savedOk);
   }catch(e){
@@ -3627,6 +3649,39 @@ $("chkSixteen").addEventListener("change", () => {
 // grid on the timeline and want nothing of it in the clip, or the other way.
 // Two countdowns over one pause say the same thing twice. The dots stand down
 // on a wait the panel at the top is already counting — unless asked otherwise.
+/* ---------- which piece of the song the singer is given ----------
+   Two presses at the playhead say where it starts and where it stops. The
+   recording itself is untouched: the cut is a setting, so tomorrow it can be
+   moved or dropped without rebuilding anything. */
+function showCut(){
+  const t = data && data.trim;
+  const on = !!(t && t.length === 2 && t[1] > t[0]);
+  $("btnCutAll").classList.toggle("hide", !on);
+  $("cutNote").textContent = on ? fmtMs(t[0]) + " – " + fmtMs(t[1]) : "";
+}
+function setCut(a, b){
+  if (!data) return;
+  const lo = Math.max(0, a), hi = Math.min(dur || 0, b);
+  data.trim = (hi - lo > 1) ? [lo, hi] : null;
+  showCut(); touched();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+}
+$("btnCutFrom").addEventListener("click", () => {
+  const t = data && data.trim;
+  setCut(mediaTime(), t && t[1] > mediaTime() ? t[1] : (dur || 0));
+  toast(T.cutSet($("cutNote").textContent));
+});
+$("btnCutTo").addEventListener("click", () => {
+  const t = data && data.trim;
+  setCut(t && t[0] < mediaTime() ? t[0] : 0, mediaTime());
+  toast(T.cutSet($("cutNote").textContent));
+});
+$("btnCutAll").addEventListener("click", () => {
+  if (!data) return;
+  data.trim = null; showCut(); touched();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+  toast(T.cutGone);
+});
 $("chkHolds").addEventListener("change", () => {
   if (!data) return;
   data.holds = $("chkHolds").checked;

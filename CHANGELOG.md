@@ -7,6 +7,30 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.53.0
+
+**The singer can be given a piece of the song instead of all of it.** Put the
+playhead where the song should start and press `⟤ from here`; put it where it
+should stop and press `⟥ to here`. Two minutes of silence, a hidden track
+after them, a lead-in nobody sings over — none of that has to travel with the
+karaoke. `⟲ whole song` undoes the idea.
+
+The recording is never touched. The cut is a setting, so it can be moved
+tomorrow, or dropped, without rebuilding anything — and the project keeps the
+whole song on disk, which is the price of being able to change your mind.
+
+Everything the page counts in seconds moves with the cut: the lines, the words
+inside them, the stretches where the original voice is kept, and the length
+itself. The sound is cut too, and re-encoded rather than copied — copying cuts
+at the nearest keyframe, which on a compressed track can be most of a second
+away, and most of a second is exactly the error nobody notices until the first
+word is missing. The key under which a browser keeps its edits takes the cut
+into account as well, or a page built from a different piece would quietly
+pull in edits made against the old one.
+
+A cut shorter than a second is a slip, not an intention, and one that covers
+the whole song is the same as none: both are refused rather than obeyed.
+
 ## 4.52.0
 
 **The key can be moved to one a singer can actually reach.** Choose a number

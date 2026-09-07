@@ -1730,6 +1730,55 @@ def main():
     check("the page knows how to draw a melody at all",
           ".mel{" in open(page_notes, encoding="utf-8").read())
 
+    print("\nThe singer is given the piece of the song they asked for")
+    # A song can hold two minutes of silence, a hidden track after it, or a
+    # long lead-in. None of that has to travel with the karaoke. The recording
+    # is never touched — the cut is a setting — but everything the page counts
+    # in seconds has to move with it, or the sound starts at one moment and
+    # the words believe another.
+    import subprocess as _sp4
+    cut_src = os.path.join(tmp, "long_song.mp3")
+    _sp4.run([AU.ffmpeg(), "-y", "-v", "error", "-f", "lavfi",
+              "-i", "sine=frequency=220:duration=30", "-ac", "1", cut_src],
+             check=True)
+    cut_lyr = L.parse("first line here\nsecond line here")
+    for _ln, _t0 in zip(cut_lyr.lines, (10.0, 15.0)):
+        for _k, _w in enumerate(_ln.words):
+            _w.start, _w.end = _t0 + _k * 0.5, _t0 + (_k + 1) * 0.5
+        _ln.start, _ln.end = _ln.words[0].start, _ln.words[-1].end
+
+    def built_with(trim):
+        out = os.path.join(tmp, f"cut{'Y' if trim else 'N'}.html")
+        B.build_html(out, cut_lyr, 30.0, {"mix": (cut_src, "audio/mpeg")},
+                     "energy", embed=True, title="Cut",
+                     keep_spans=[(2.0, 6.0), (12.0, 13.0)], trim=trim)
+        return out, B.read_payload(out)["data"]
+
+    whole_p, whole = built_with(None)
+    piece_p, piece = built_with((8.0, 22.0))
+    check("the whole song is the whole song", whole["duration"] == 30.0,
+          whole["duration"])
+    check("a cut song is as long as the cut", piece["duration"] == 14.0,
+          piece["duration"])
+    check("and its lines moved with it",
+          [r["start"] for r in piece["lines"]] == [2.0, 7.0],
+          [r["start"] for r in piece["lines"]])
+    check("the words inside them too",
+          piece["lines"][0]["words"][0]["t"] == 2.0,
+          piece["lines"][0]["words"][0])
+    check("a kept stretch outside the piece is gone, one inside has moved",
+          piece["keepSpans"] == [[4.0, 5.0]], piece["keepSpans"])
+    check("and the sound itself was cut, not only the numbers",
+          os.path.getsize(piece_p) < os.path.getsize(whole_p) * 0.75,
+          f"{os.path.getsize(piece_p)//1024} KB against "
+          f"{os.path.getsize(whole_p)//1024} KB")
+    # nonsense is not obeyed: a slip must not silently shorten a song
+    check("a cut shorter than a second is not a cut", B._cut_range((5, 5.4), 30) is None)
+    check("a cut covering the whole song is not one either",
+          B._cut_range((0, 30), 30) is None)
+    check("and rubbish is refused rather than guessed at",
+          B._cut_range(("x", None), 30) is None)
+
     print("\nSomebody else's karaoke can be read, not only written")
     # Months of work went into an UltraStar file too, and asking for it twice
     # is no kinder than losing it. Checked by sending our own export back
