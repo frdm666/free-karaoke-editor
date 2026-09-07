@@ -500,11 +500,22 @@ longer a fixed number either — the band where the words stand is measured on
 every field, and the frame clamps down the instant a cut brings something
 bright under the text, letting go slowly afterwards. `🎞✕` takes it away.
 
-When the song has a separated vocal, the words are measured for pitch as
-well as time, and the video draws the melody: a bar over each word, as high as
-that word is sung, lighting up with it. It is a map to sing by, not a score —
-nothing here marks anybody. Words the measurement could not reach carry no bar,
-because a guessed note is one a singer would believe.
+A wait inside a line — a held note, an answer from the guitar — shows itself:
+a bar grows under the word that will end it, so the singer knows something is
+still coming and how near it is. Without that the sweep just stops, and from a
+couch that reads like the end of the line.
+
+When the song has a separated vocal, the words are measured for pitch as well
+as time. **`melody over the words`** then draws it: a bar over each word, as
+high as that word is sung, lighting up with it. It is a map to sing by, not a
+score — nothing here marks anybody — and it is off unless you ask, because
+over the words is a strong place to put anything uninvited. Words the
+measurement could not reach carry no bar, since a guessed note is one a singer
+would believe.
+
+The strip along the bottom is the song rather than a line filling up: a dash
+where each line is sung, lit once it has been, with a marker where the song
+stands. A long wait is a distance to the next dash instead of a blank.
 
 **`⇪`** holds the other ways out: an UltraStar file for the singing games,
 `.ass` subtitles with a word-by-word karaoke sweep, and **`⇩ Pack`** — the

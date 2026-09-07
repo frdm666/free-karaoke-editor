@@ -412,6 +412,134 @@ def main():
     check("the picture behind is bright, so the ring earned it",
           open_l > 120, f"{open_l:.0f} of 255")
 
+    print("\nThe strip along the bottom is the song, not a filling line")
+    # A plain line filling up says how far through the song you are and nothing
+    # else. A dash for every line, laid where that line falls in the time, says
+    # where the singing is — so a wait is a visible distance to the next dash
+    # rather than a blank.
+    strip_words = "a line of words here".split()
+    strip_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                  "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                  "data": {"title": "Shape", "duration": 30.0, "lines": [
+        {"text": " ".join(strip_words), "start": 3.0, "end": 5.5, "voice": 1,
+         "words": [{"w": w, "t": 3.0 + i * 0.5, "d": 0.5, "s": 1}
+                   for i, w in enumerate(strip_words)]},
+        {"text": " ".join(strip_words), "start": 24.0, "end": 26.5, "voice": 1,
+         "words": [{"w": w, "t": 24.0 + i * 0.5, "d": 0.5, "s": 1}
+                   for i, w in enumerate(strip_words)]}]}}
+    wav_s = tone(os.path.join(tmp, "s.wav"), 220.0, 30.0)
+
+    class AST:
+        width, height, fps, crf = 900, 506, 10, 30
+        preset, font, timings = "ultrafast", None, None
+        start, seconds, audio = 0.0, 0.0, "minus"
+        intro = False
+        still = 14.0                  # deep in the gap between the two lines
+        output = os.path.join(tmp, "strip.png")
+    video.render(strip_song, wav_s, AST.output, AST())
+    st = Image.open(AST.output).convert("RGB")
+    Ws, Hs = st.size
+    row = st.crop((0, int(Hs * 0.95), Ws, int(Hs * 0.975)))
+    rp = row.load()
+
+    def ink_between(a, b):
+        """How much of the strip between two fractions of the width is drawn."""
+        return sum(1 for x in range(int(Ws * a), int(Ws * b))
+                   for y in range(row.height) if sum(rp[x, y]) > 150)
+
+    # the first line lives around a tenth of the way in, the second past three
+    # quarters, and the long middle holds nothing at all
+    early, middle, late = ink_between(0.08, 0.20), ink_between(0.30, 0.60), \
+        ink_between(0.76, 0.92)
+    check("a dash stands where the singing is", early > 8 and late > 8,
+          f"{early} early, {late} late")
+    check("and the quiet between them is left quiet", middle < early // 2,
+          f"{middle} against {early}")
+
+    print("\nThe melody is drawn only when it is asked for")
+    # It is a strong thing to put over the words, and a singer who wants them
+    # plain should get them plain. The notes are measured and kept either way.
+    mel_words = "up we go now".split()
+    mel_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                "data": {"title": "M", "duration": 12.0, "lines": [
+        {"text": " ".join(mel_words), "start": 2.0, "end": 6.0, "voice": 1,
+         "words": [{"w": w, "t": 2.0 + i, "d": 1.0, "s": 1, "n": 60 + i * 4}
+                   for i, w in enumerate(mel_words)]}]}}
+    wav_m = tone(os.path.join(tmp, "m.wav"), 220.0, 12.0)
+
+    def mel_frame(on):
+        class AM:
+            width, height, fps, crf = 800, 450, 10, 30
+            preset, font, timings = "ultrafast", None, None
+            start, seconds, audio = 0.0, 0.0, "minus"
+            intro = False
+        a = AM(); a.still = 4.5
+        a.output = os.path.join(tmp, f"mel-{int(on)}.png")
+        song = dict(mel_song); song["melody"] = on
+        video.render(song, wav_m, a.output, a)
+        return Image.open(a.output).convert("RGB")
+
+    plain, mapped = mel_frame(False), mel_frame(True)
+    from PIL import ImageChops as _IC2
+    mel_diff = _IC2.difference(plain, mapped)
+    mel_box = mel_diff.getbbox()
+    check("asked for, the melody appears", mel_box is not None, mel_box)
+    check("and it appears above the words, where it belongs",
+          mel_box is not None and mel_box[3] < 450 * 0.45, mel_box)
+
+    print("\nA wait inside a line is felt, not guessed at")
+    # Between two words of one line there can be a bar of silence. The sweep
+    # stops there and says nothing about why, so from a couch it reads exactly
+    # like the end of the line. A bar under the word that comes next, filling
+    # as the wait runs out, says both: something is coming, and it is this near.
+    hw = ["we", "wait", "right", "here", "then", "carry", "on"]
+    ht = [2.0, 2.5, 3.0, 3.5, 6.2, 6.7, 7.2]          # a 2.2 s wait before “then”
+    hold_song = {"colors": ["#4de1ff", "#ff8ad1"],
+                 "theme": {"bg": "#0a0b14", "text": "#e8ebf5"},
+                 "data": {"title": "Hold", "duration": 12.0, "lines": [
+        {"text": " ".join(hw), "start": 2.0, "end": 7.65, "voice": 1,
+         "words": [{"w": w, "t": t, "d": 0.45, "s": 1}
+                   for w, t in zip(hw, ht)]}]}}
+    wav_h = tone(os.path.join(tmp, "h.wav"), 220.0, 12.0)
+
+    def hold_frame(at):
+        class AH:
+            width, height, fps, crf = 900, 506, 10, 30
+            preset, font, timings = "ultrafast", None, None
+            start, seconds, audio = 0.0, 0.0, "minus"
+            intro = False
+        a = AH(); a.still = at
+        a.output = os.path.join(tmp, f"hold-{at}.png")
+        video.render(hold_song, wav_h, a.output, a)
+        return Image.open(a.output).convert("RGB")
+
+    def lit_run(im):
+        """The widest run of the sweep colour along the line's underline."""
+        Wh, Hh = im.size
+        px = im.load()
+        best = 0
+        for y in range(int(Hh * 0.46), int(Hh * 0.54)):
+            run = 0
+            for x in range(Wh):
+                c = px[x, y]
+                near = all(abs(c[i] - video.COL_HOT[i]) < 46 for i in range(3))
+                run = run + 1 if near else 0
+                best = max(best, run)
+        return best
+
+    early, late = lit_run(hold_frame(4.2)), lit_run(hold_frame(6.0))
+    done = lit_run(hold_frame(6.5))          # the wait is over, the word is sung
+    # A bar is a solid run of tens of pixels; the thickest letter stroke is a
+    # fraction of that. Forty is comfortably between the two, so the check
+    # cannot pass on the letters alone — which it would have, comparing one
+    # small number with another.
+    check("a wait inside a line shows itself", early > 3, early)
+    check("and it fills as the wait runs out", late > 40 and late > early + 8,
+          f"{early} -> {late}")
+    check("when the singing comes back the mark is gone", done < 40,
+          f"{done}, against {late} at the end of the wait")
+
     print("\nOne pause, one countdown")
     # The three guide dots count the seconds before a line. A wait long enough
     # also gets the panel at the top with the seconds and the bar — and both

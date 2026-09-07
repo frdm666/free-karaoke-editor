@@ -345,6 +345,13 @@
     .side h3{padding:7px 14px 4px}
     .side .sum{min-height:1.6rem}
     .probs{min-height:2rem}
+    /* The toolbar may hold as many controls as it needs. What it may not do is
+       take the height from everything above it: each row it wrapped onto came
+       out of the editor and, through it, out of the Check panel — which is how
+       a single new checkbox squeezed that panel to nothing, twice. On a short
+       window it gets a ceiling and scrolls inside itself instead, and nothing
+       above it has to give way again. */
+    .tlhead{max-height:4.8rem; overflow-y:auto; overflow-x:hidden}
   }
   /* On a cramped window the how-to paragraph under the toolbar is a luxury:
      it wraps into several rows and starves the editor of the very height the
@@ -764,6 +771,9 @@
       <label class="chk" data-tt="pulseHint"
              title="Show the beat in the video as four quiet dots in the corner"><input
              type="checkbox" id="chkPulse"> <span data-t="pulseOn">pulse in the video</span></label>
+      <label class="chk" data-tt="melodyHint"
+             title="Draw the melody over the words: a bar to a word, as high as it is sung"><input
+             type="checkbox" id="chkMelody"> <span data-t="melodyOn">melody over the words</span></label>
       <label class="chk" data-tt="dotsLongHint"
              title="Let the three guide dots count down long waits too, beside the panel that already counts them"><input
              type="checkbox" id="chkDotsLong"> <span data-t="dotsLongOn">dots on long waits</span></label>

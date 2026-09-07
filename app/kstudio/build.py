@@ -126,7 +126,8 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
                cover_dark: Optional[int] = None,
                cover_paths: Optional[list] = None,
                grid: Optional[dict] = None,
-               dots_long: bool = False) -> str:
+               dots_long: bool = False,
+               melody: bool = False) -> str:
     """tracks: {\'mix\'|\'instrumental\'|\'vocals\': (path, mime)} → path to the HTML."""
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
@@ -178,6 +179,10 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
         # the panel at the top counting it. One pause, one countdown, unless
         # the singer says otherwise.
         "dotsLong": bool(dots_long),
+        # The melody over the words is a strong thing to put next to them, and
+        # a singer who wants the words plain should get them plain. Off unless
+        # asked for; the notes are measured and kept either way.
+        "melody": bool(melody),
         "engineLabel": ENGINE_LABEL.get(engine, engine),
         "audio": audio,
         "data": {

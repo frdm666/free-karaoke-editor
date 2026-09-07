@@ -369,6 +369,11 @@ const STR = {
     sixteenths: "16ths",
     pulseOn: "pulse in the video",
     dotsLongOn: "dots on long waits",
+    melodyOn: "melody over the words",
+    melodyHint: "Draw the melody over the words: a bar to a word, standing as "
+      + "high as that word is sung. A map to sing by, never a score. Off by "
+      + "default — the words come first, and this is a strong thing to put "
+      + "beside them uninvited. The notes are measured and kept either way.",
     dotsLongHint: "The three guide dots count down the seconds before a line. "
       + "On a wait long enough for the panel at the top of the frame they "
       + "stand down, so one pause is not counted twice over. Tick this for "
@@ -802,6 +807,12 @@ const STR = {
     sixteenths: "16-е",
     pulseOn: "пульс в ролике",
     dotsLongOn: "точки и на долгих паузах",
+    melodyOn: "мелодия над словами",
+    melodyHint: "Рисовать мелодию над словами: столбик над каждым словом на "
+      + "той высоте, на какой оно поётся. Карта, по которой поют, и никогда "
+      + "не оценка. По умолчанию выключено — слова важнее, а это сильная "
+      + "вещь, чтобы ставить её рядом без спроса. Ноты меряются и хранятся в "
+      + "любом случае.",
     dotsLongHint: "Три точки отсчитывают секунды перед строкой. На паузе, "
       + "достаточно длинной для таблички вверху кадра, они уступают ей место, "
       + "чтобы одна пауза не отсчитывалась дважды. Поставьте галку, если "
@@ -1755,6 +1766,7 @@ async function openProject(id){
           pulse: !!gsav.pulse};
   showGrid();
   $("chkDotsLong").checked = !!data.dotsLong;
+  $("chkMelody").checked = !!data.melody;
   colors = (Array.isArray(data.colors) && data.colors.length === 2)
     ? data.colors.slice() : ["#4de1ff", "#ff8ad1"];
   theme = (Array.isArray(data.theme) && data.theme.length === 2)
@@ -2470,7 +2482,8 @@ async function saveNow(){
        coverDark: (data && data.coverDark != null) ? data.coverDark : undefined,
        grid: (data && data.grid) ? data.grid : undefined,
        dotsLong: (data && data.dotsLong !== undefined)
-                 ? !!data.dotsLong : undefined});
+                 ? !!data.dotsLong : undefined,
+       melody: (data && data.melody !== undefined) ? !!data.melody : undefined});
     showProblems(r.problems);
     saveState("ok", T.savedOk);
   }catch(e){
@@ -3598,6 +3611,12 @@ $("chkSixteen").addEventListener("change", () => {
 // grid on the timeline and want nothing of it in the clip, or the other way.
 // Two countdowns over one pause say the same thing twice. The dots stand down
 // on a wait the panel at the top is already counting — unless asked otherwise.
+$("chkMelody").addEventListener("change", () => {
+  if (!data) return;
+  data.melody = $("chkMelody").checked;
+  touched();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+});
 $("chkDotsLong").addEventListener("change", () => {
   if (!data) return;
   data.dotsLong = $("chkDotsLong").checked;

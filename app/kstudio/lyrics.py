@@ -356,11 +356,16 @@ def parse(raw: str) -> Lyrics:
                 voice = int(m.group(1))     # “2: line” — this line only
                 line = m.group(2).strip()
 
-        # “line x4” — a repeat. With manual LRC timings repeats are left alone:
-        # every line there has a time of its own.
+        # “line x4” — a repeat. A line that carries its own time is not
+        # repeated: the time belongs to one line, and three lines cannot share
+        # it. But the mark must not be sung either — it used to stay in the
+        # words and go up on the screen as “x3”, which is the one outcome
+        # nobody could have meant.
         times = 1
         if start is None:
             line, times = _split_repeat(line)
+        else:
+            line = _split_repeat(line)[0]
 
         # A backing tail on a lead line becomes a line of its own, second
         # voice: “try too hard (Na-na-na)” is two people singing.

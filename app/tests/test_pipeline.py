@@ -288,8 +288,14 @@ def main():
     check("“x-files” does not count as a repeat", "Строка про x-files" in texts,
           " | ".join(texts))
     lrc = _parse("[00:10.00] Строка x2\n[00:20.00] Другая\n")
-    check("with manual timings repeats are left alone",
-          [l.text for l in lrc.lines] == ["Строка x2", "Другая"],
+    # A line carrying its own time is not repeated: the time belongs to one
+    # line and two cannot share it. But the mark is not part of the song
+    # either — it used to stay in the words and go up on the screen as “x2”,
+    # which is the one reading nobody could have meant.
+    check("with manual timings a repeat mark makes no second line",
+          len(lrc.lines) == 2, str([l.text for l in lrc.lines]))
+    check("and the mark itself is not left in the words to be sung",
+          [l.text for l in lrc.lines] == ["Строка", "Другая"],
           str([l.text for l in lrc.lines]))
 
     print("\nExtracting the voice against a foreign master")

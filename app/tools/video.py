@@ -59,6 +59,12 @@ NOTE_BAND = 0.075               # how much of the frame's height the map takes
 NOTE_GAP = 0.016                # and how far it stands above the line
 NOTE_THICK = 0.0075             # a bar's own thickness
 NOTE_SPREAD = 12                # the fewest semitones the map is drawn across
+# A pause inside a line has nowhere to show itself: the sweep simply stops,
+# and from the seat it reads the same as the end of the line. So a wait long
+# enough to be felt puts a bar under the word that comes after it, filling as
+# the wait runs out — the singer sees which word is next and how near.
+HOLD_MIN = 0.60                 # a shorter gap is articulation, not a wait
+HOLD_THICK = 0.006              # the bar's own thickness
 
 # A clip standing behind the lyrics is not there to be watched — it is there
 # to move a little colour. So it is taken small and blurred into a field.
@@ -732,6 +738,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     # Whether the three dots also count down a wait that already has the panel
     # at the top counting it. Off by default: one pause, one countdown.
     dots_long = bool(payload.get("dotsLong"))
+    show_melody = bool(payload.get("melody"))
     # The range the melody is drawn across, taken from the whole song so a
     # rising line looks like it rises. A song that barely moves is still given
     # an octave, or every bar would sit at the top of the map.
@@ -861,7 +868,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
         one. A line that wrapped onto two rows is left alone: there is one
         strip of room above it, and two rows of words to put in it.
         """
-        if note_lo is None or alpha <= 0.02:
+        if not show_melody or note_lo is None or alpha <= 0.02:
             return
         ws = line.get("words") or []
         if not ws or len(pic.word_x) < len(ws):
@@ -887,6 +894,37 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             col = _mix(BG_TOP, hot if done else COL_DIM,
                        (0.85 if done else 0.45) * alpha)
             d.rectangle([x0, y, x1, y + thick], fill=col)
+
+    def draw_hold(d, pic, line, t, y_line, alpha=1.0):
+        """The wait inside a line, made visible under the word that ends it.
+
+        Between two words of one line there can be a bar's worth of silence —
+        a held note before it, an instrumental answer, a breath taken on
+        purpose. The sweep stops there and says nothing about why, so from a
+        couch it reads exactly like the end of the line. A bar under the word
+        that comes next, filling as the wait runs out, says both things at
+        once: something is still coming, and it is this near.
+        """
+        ws = line.get("words") or []
+        if len(ws) < 2 or alpha <= 0.02 or len(pic.word_x) < len(ws):
+            return
+        for i in range(1, len(ws)):
+            prev_end = (ws[i - 1].get("t") or 0) + (ws[i - 1].get("d") or 0)
+            here = ws[i].get("t") or 0
+            wait = here - prev_end
+            if wait < HOLD_MIN or not (prev_end <= t < here):
+                continue
+            gone = (t - prev_end) / max(wait, 1e-6)
+            x0 = pic.word_x[i]
+            full = max(pic.word_w[i], 4)
+            row = pic.word_row[i]
+            y = y_line + pic.pad + row * pic.row_h + pic.row_h - int(H * 0.012)
+            thick = max(2, int(H * HOLD_THICK))
+            d.rectangle([x0, y, x0 + full, y + thick],
+                        fill=_mix(BG_TOP, COL_DIM, 0.55 * alpha))
+            d.rectangle([x0, y, x0 + full * min(max(gone, 0.0), 1.0), y + thick],
+                        fill=_mix(BG_TOP, COL_HOT, 0.90 * alpha))
+            break                       # one wait at a time, the one we are in
 
     def draw_queue(frame, n1, duo=-1, off=0, alpha=1.0):
         """The line coming next, and the one after it fainter still — the
@@ -967,12 +1005,45 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     beat_zero = float(beat_at.get("beat0") or 0.0) if beat_at else 0.0
 
     def furniture(d, prog, at=None):
-        """The bar along the bottom: on every frame, the opening included."""
+        """The strip along the bottom: on every frame, the opening included.
+
+        It used to be a plain line filling up, which says how far through the
+        song you are and nothing else. It is the song itself now: a dash for
+        every line, laid where that line falls in the time. Sung dashes are
+        lit, the ones ahead are not, and a marker stands where the song is —
+        so the wait before singing is not a blank line but a visible distance
+        to the next dash. Where nobody sings there is nothing, which is the
+        point: the gaps are the shape of the song.
+        """
         bar_y, bar_h = int(H * 0.955), max(int(H * 0.004), 2)
-        d.rectangle([margin, bar_y, W - margin, bar_y + bar_h], fill=(40, 45, 68))
-        if prog > 0:
-            d.rectangle([margin, bar_y, margin + (W - 2 * margin) * prog,
-                         bar_y + bar_h], fill=COL_BAR)
+        track = W - 2 * margin
+        # the faintest of grounds, so the strip has extent where a song is quiet
+        d.rectangle([margin, bar_y + bar_h // 3, W - margin,
+                     bar_y + bar_h - bar_h // 3], fill=(24, 27, 42))
+        now = (at if at is not None else prog * duration)
+        for ln in lines:
+            a = float(ln.get("start") or 0.0)
+            b = float(ln.get("end") or a)
+            if b <= a or duration <= 0:
+                continue
+            x0 = margin + track * min(max(a / duration, 0.0), 1.0)
+            x1 = margin + track * min(max(b / duration, 0.0), 1.0)
+            x1 = max(x1, x0 + 2)
+            # One colour for every dash, whichever voice sings it: a mark two
+            # pixels tall carries no hue anybody can read, and the voices'
+            # own colours are for the words. Painting furniture in them would
+            # say the second voice is singing down here.
+            hue = COL_BAR
+            d.rectangle([x0, bar_y, x1, bar_y + bar_h], fill=COL_PIP)
+            if now > a:
+                done_x = x0 if now >= b else \
+                    x0 + (x1 - x0) * (now - a) / max(b - a, 1e-6)
+                d.rectangle([x0, bar_y, max(x1 if now >= b else done_x, x0 + 1),
+                             bar_y + bar_h], fill=hue)
+        if now > 0:
+            px = margin + track * min(max(now / duration, 0.0), 1.0)
+            d.rectangle([px - 1, bar_y - bar_h, px + 1, bar_y + bar_h * 2],
+                        fill=COL_HOT)
         if beat_len <= 0 or at is None:
             return
         # Which beat of the bar, and how long ago it struck: the dot flashes
@@ -1231,6 +1302,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                     paste_faded(frame, piece, (bx[0], y_j + bx[1]), a_j)
                 if k == 0:
                     draw_notes(d, pic, lines[j], t, y_j, a_j)
+                    draw_hold(d, pic, lines[j], t, y_j, a_j)
                 if k == 0 and lines[j].get("section"):
                     d.text((margin, y_j - int(H * 0.055)),
                            lines[j]["section"].upper(), font=small,

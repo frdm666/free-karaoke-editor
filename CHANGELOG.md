@@ -7,6 +7,42 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.51.0
+
+**The strip along the bottom is the song now, not a line filling up.** A dash
+for every line, laid where that line falls in the time; the sung ones lit, the
+ones ahead not, and a marker where the song stands. A plain bar told you how
+far through you were and nothing else — this tells you where the singing is,
+so a wait is a visible distance to the next dash instead of a blank. Where
+nobody sings there is nothing, and those gaps are the shape of the song.
+
+Every dash is one colour whatever voice sings it. A mark two pixels tall
+carries no hue anybody can read, and the voices' own colours mean the words:
+painting furniture in them says the second voice is singing down there.
+
+**The melody over the words is off unless it is asked for.** It was drawn
+whenever the notes existed, and over the words is a strong place to put
+anything uninvited. A checkbox turns it on. The notes go on being measured and
+kept either way — the singing games still get them, and turning the map back
+on is one click, not a rebuild.
+
+## 4.50.0
+
+**A wait inside a line is shown, not left to be guessed at.** Between two
+words of one line there can be a bar of silence — a held note, an answer from
+the guitar, a breath taken on purpose. The sweep simply stopped there and said
+nothing about why, so from a couch it read exactly like the end of the line. A
+bar now grows under the word that will end the wait, filling as the wait runs
+out: something is still coming, and it is this near. Gaps shorter than
+six tenths of a second get nothing — that is articulation, not a wait.
+
+**A repeat mark on a timed line is no longer sung.** “line x3” means three
+lines, but a line that carries its own `[1:05]` is not repeated: the time
+belongs to one line and three cannot share it. That much was deliberate. What
+was not is that the mark then stayed in the words and went up on the screen as
+“x3”, which is the one outcome nobody could have meant. It is dropped now, and
+a line that genuinely ends in an x is left alone.
+
 ## 4.49.0
 
 **One pause is counted down once.** The three guide dots count the seconds
