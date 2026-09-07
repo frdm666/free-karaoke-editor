@@ -664,7 +664,17 @@ python app/tools/video.py page.html -o clip.mp4
 ```
 
 1920×1080 by default, `--audio minus|guide|original`, `--seconds N` to render a
-short sample first, `--backdrop FILE` to stand a clip behind the lyrics. Before drawing, the video prints its own report — song,
+short sample first, `--backdrop FILE` to stand a clip behind the lyrics,
+`--semitones N` to move the key.
+
+Not every song sits where a given throat can reach it. The key is a choice in
+the render dialog and a number on the command line: the whole clip moves by
+that many semitones, the tempo stays where it was, and the frame says so when
+the key is not the recorded one. The measured notes move with the sound.
+
+An UltraStar file made elsewhere opens as a timed song — beats, notes,
+syllables and all — so work done in another program does not have to be done
+again. Before drawing, the video prints its own report — song,
 length, lines, where two voices sing at once, stretches left to the original,
 colours, audio mode, number of frames — so a wrong file or forgotten marks show
 up before the long part, not after it.

@@ -1730,6 +1730,79 @@ def main():
     check("the page knows how to draw a melody at all",
           ".mel{" in open(page_notes, encoding="utf-8").read())
 
+    print("\nSomebody else's karaoke can be read, not only written")
+    # Months of work went into an UltraStar file too, and asking for it twice
+    # is no kinder than losing it. Checked by sending our own export back
+    # through our own reader: times, notes, syllables and the words nobody
+    # measured all have to come home.
+    from kstudio import interop as IO4
+    rt = {"title": "Round", "artist": "Trip", "lines": [
+        {"words": [{"w": "up", "t": 1.0, "d": 0.5, "s": 1, "n": 60},
+                   {"w": "the", "t": 1.5, "d": 0.5, "s": 1, "n": 62},
+                   {"w": "hill", "t": 2.0, "d": 0.5, "s": 1, "n": 64},
+                   {"w": "side", "t": 2.5, "d": 0.5, "s": 1, "n": 64, "g": True}]},
+        {"words": [{"w": "and", "t": 4.0, "d": 0.5, "s": 1},
+                   {"w": "down", "t": 4.5, "d": 0.5, "s": 1, "n": 59}]}]}
+    us_text = IO4.ultrastar_text(rt, "a.mp3")
+    check("an UltraStar file is recognised for what it is",
+          IO4.looks_ultrastar(us_text))
+    check("and a page of words is not mistaken for one",
+          not IO4.looks_ultrastar("первая строка\nвторая строка\n"))
+    got_us = IO4.ultrastar_read(us_text)
+    w1 = got_us["lines"][0]["words"]
+    check("it comes back as the same two lines",
+          len(got_us["lines"]) == 2, len(got_us["lines"]))
+    check("with the words where they were",
+          [round(w["t"], 2) for w in w1] == [1.0, 1.5, 2.0, 2.5],
+          [round(w["t"], 2) for w in w1])
+    check("the notes that were measured", [w.get("n") for w in w1] == [60, 62, 64, 64],
+          [w.get("n") for w in w1])
+    check("the syllable still a syllable of its word",
+          w1[3].get("g") is True and w1[2].get("g") is not True,
+          [w.get("g") for w in w1])
+    check("and a word nobody measured stays unmeasured",
+          got_us["lines"][1]["words"][0].get("n") is None,
+          got_us["lines"][1]["words"][0])
+    # …and the same file, opened the way a person opens one
+    us_path = os.path.join(tmp, "someone_else.txt")
+    open(us_path, "w", encoding="utf-8").write(us_text)
+    opened = L.load(us_path)
+    check("opening such a file gives a timed song, not a page of words",
+          opened.has_manual_times and len(opened.lines) == 2
+          and abs(opened.lines[0].words[0].start - 1.0) < 1e-6,
+          [(ln.text, ln.start) for ln in opened.lines])
+    check("with its notes intact",
+          [w.note for w in opened.lines[0].words] == [60, 62, 64, 64],
+          [w.note for w in opened.lines[0].words])
+
+    print("\nA key the singer can reach")
+    # Not every song sits where a given throat can. The whole track is moved
+    # at once, and the tempo must not move with it — a key change is not a
+    # speed change. Measured against the pitch reader, which knows nothing
+    # about how the shift was done.
+    if PI.available():
+        import subprocess as _sp3
+        key_src = os.path.join(tmp, "key_a3.wav")
+        _sp3.run([AU.ffmpeg(), "-y", "-v", "error", "-f", "lavfi",
+                  "-i", "sine=frequency=220:duration=3", "-ar", "44100",
+                  "-ac", "1", key_src], check=True)
+        base = PI.note_of(PI.contour(key_src), 0.5, 2.5)
+        check("the track starts where we think it does", base == 57, base)
+        moved = []
+        for step in (2, -3):
+            dst = os.path.join(tmp, f"key{step}.wav")
+            used = AU.shift_pitch(key_src, dst, step)
+            moved.append((step, PI.note_of(PI.contour(used), 0.5, 2.0),
+                          round(AU.duration(used), 2)))
+        check("the key moves by exactly what was asked",
+              [m[1] for m in moved] == [59, 54], moved)
+        check("and the song does not get faster or slower with it",
+              all(abs(m[2] - 3.0) < 0.15 for m in moved), moved)
+        check("asking for nothing changes nothing, not even a copy",
+              AU.shift_pitch(key_src, os.path.join(tmp, "key0.wav"), 0) == key_src)
+        check("and a key nobody could sing is brought back into range",
+              AU.SHIFT_MAX == 12, AU.SHIFT_MAX)
+
     print("\nThe singing games get real notes, or none at all")
     from kstudio import interop as IO3
     us = IO3.ultrastar_text({"title": "T", "lines": [{"words": [

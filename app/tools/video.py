@@ -361,7 +361,24 @@ def keep_spans(payload: dict) -> list:
     return [(a, b, lv) for a, b, lv in merged]
 
 
-def extract_audio(payload: dict, html_path: str, tmp: str, mode: str) -> str:
+def extract_audio(payload: dict, html_path: str, tmp: str, mode: str,
+                  semitones: float = 0) -> str:
+    """The track the video needs, in a key the singer can reach.
+
+    The key change is one pass over the finished mix rather than a step inside
+    each of the ways the mix can be made: whatever came out — instrumental,
+    instrumental with the original kept on marked stretches, the whole
+    recording — is moved by the same amount, once.
+    """
+    wav = _extract_audio(payload, html_path, tmp, mode)
+    n = max(-AU.SHIFT_MAX, min(AU.SHIFT_MAX, float(semitones or 0)))
+    if abs(n) < 0.01:
+        return wav
+    print(tr(f"Key: {n:+g} semitones", f"Тональность: {n:+g} полутона"))
+    return AU.shift_pitch(wav, os.path.join(tmp, "keyed.wav"), n)
+
+
+def _extract_audio(payload: dict, html_path: str, tmp: str, mode: str) -> str:
     """Pull the needed track out of the page (or a file next to it) into WAV."""
     srcs = {}
     for name, uri in payload.get("audio", {}).items():
@@ -739,6 +756,20 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     # at the top counting it. Off by default: one pause, one countdown.
     dots_long = bool(payload.get("dotsLong"))
     show_melody = bool(payload.get("melody"))
+    # The bar that fills under the word ending a pause inside a line. On by
+    # default — it answers a question the frame otherwise leaves open — but a
+    # singer who finds it busy can have the words plain.
+    show_holds = payload.get("holds") is not False
+    # The key change moves the sound; the notes were measured before it, so
+    # they are moved by the same amount. A melody drawn a tone away from what
+    # comes out of the speakers is worse than no melody at all.
+    key_shift = max(-AU.SHIFT_MAX, min(AU.SHIFT_MAX,
+                                       float(getattr(args, "semitones", 0) or 0)))
+    if abs(key_shift) >= 0.01:
+        for _ln in lines:
+            for _w in (_ln.get("words") or []):
+                if isinstance(_w.get("n"), (int, float)):
+                    _w["n"] = _w["n"] + key_shift
     # The range the melody is drawn across, taken from the whole song so a
     # rising line looks like it rises. A song that barely moves is still given
     # an octave, or every bar would sit at the top of the map.
@@ -906,7 +937,8 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
         once: something is still coming, and it is this near.
         """
         ws = line.get("words") or []
-        if len(ws) < 2 or alpha <= 0.02 or len(pic.word_x) < len(ws):
+        if not show_holds or len(ws) < 2 or alpha <= 0.02 \
+                or len(pic.word_x) < len(ws):
             return
         for i in range(1, len(ws)):
             prev_end = (ws[i - 1].get("t") or 0) + (ws[i - 1].get("d") or 0)
@@ -914,15 +946,21 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             wait = here - prev_end
             if wait < HOLD_MIN or not (prev_end <= t < here):
                 continue
-            gone = (t - prev_end) / max(wait, 1e-6)
-            x0 = pic.word_x[i]
-            full = max(pic.word_w[i], 4)
-            row = pic.word_row[i]
+            gone = min(max((t - prev_end) / max(wait, 1e-6), 0.0), 1.0)
+            # It runs along the word just sung and across the space after it,
+            # arriving at the next word exactly as that word begins. Under the
+            # word that is coming it read as an instruction to sing that word,
+            # and people sang it.
+            x0 = pic.word_x[i - 1]
+            x1 = pic.word_x[i]
+            if x1 <= x0 + 3:            # a wrapped row: the two are not neighbours
+                continue
+            row = pic.word_row[i - 1]
             y = y_line + pic.pad + row * pic.row_h + pic.row_h - int(H * 0.012)
             thick = max(2, int(H * HOLD_THICK))
-            d.rectangle([x0, y, x0 + full, y + thick],
+            d.rectangle([x0, y, x1, y + thick],
                         fill=_mix(BG_TOP, COL_DIM, 0.55 * alpha))
-            d.rectangle([x0, y, x0 + full * min(max(gone, 0.0), 1.0), y + thick],
+            d.rectangle([x0, y, x0 + (x1 - x0) * gone, y + thick],
                         fill=_mix(BG_TOP, COL_HOT, 0.90 * alpha))
             break                       # one wait at a time, the one we are in
 
@@ -976,6 +1014,11 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     shown_name = ""
     if title:
         shown_name = title
+        # A song in another key is not the song as recorded, and a month later
+        # nobody remembers why it sounds wrong. The frame says so where the
+        # name is, and only when there is something to say.
+        if abs(key_shift) >= 0.01:
+            shown_name += f"  ·  {key_shift:+g}"
         while len(shown_name) > 8 \
                 and name_font.getlength(shown_name) > W - 2 * margin:
             shown_name = shown_name[:-2].rstrip() + "\u2026"
@@ -1550,6 +1593,8 @@ def main(argv=None) -> int:
     p.add_argument("--crf", type=int, default=20, help="quality: lower is better (18–24)")
     p.add_argument("--preset", default="medium", help="x264 encoding speed")
     p.add_argument("--font", help="path to a .ttf")
+    p.add_argument("--semitones", type=float, default=0,
+                   help="move the key: +2 is two semitones up, -3 three down")
     p.add_argument("--backdrop",
                    help="a clip to stand behind the lyrics, blurred to a "
                         "slow field of colour")
@@ -1688,7 +1733,8 @@ def render_one(html_path: str, args) -> int:
     tmp = tempfile.mkdtemp(prefix="karaoke_video_")
     t0 = time.time()
     try:
-        wav = extract_audio(payload, html_path, tmp, args.audio)
+        wav = extract_audio(payload, html_path, tmp, args.audio,
+                            getattr(args, "semitones", 0))
         song = AU.duration(wav)
         want = min(song - args.start, args.seconds) if args.seconds else song - args.start
         print(video_report(payload, args, song, want))

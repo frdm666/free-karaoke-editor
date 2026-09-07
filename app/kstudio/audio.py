@@ -198,6 +198,46 @@ def encode(src: str, dst_base: str, codec: str = "mp3", sample_rate: int = 44100
 LEVEL_VOICE = "highpass=f=80,dynaudnorm=f=200:g=15:p=0.9,alimiter=limit=0.95"
 
 
+# How far the key may be moved. An octave either way is more than anybody
+# sings, and it is also where the arithmetic stays honest: past it the tempo
+# correction has to be applied twice and the sound suffers for nothing.
+SHIFT_MAX = 12
+
+
+def shift_pitch(src: str, dst: str, semitones: float) -> str:
+    """Move a track by `semitones`, keeping its tempo. Returns the path used.
+
+    Two ways to do it. `rubberband` is the one built for this and leaves the
+    sound alone; it is not in every ffmpeg. Failing that, the old trick: play
+    the file at a different rate — which moves the pitch and the tempo
+    together — and put the tempo back. That one is coarser, and a singer will
+    hear it on a big shift, which is the honest price of not having the good
+    filter.
+
+    A shift of nothing is not a copy: the file comes back as it was.
+    """
+    n = max(-SHIFT_MAX, min(SHIFT_MAX, float(semitones or 0)))
+    if abs(n) < 0.01:
+        return src
+    ratio = 2.0 ** (n / 12.0)
+    ways = [
+        ["-af", f"rubberband=pitch={ratio:.6f}"],
+        # asetrate moves pitch and tempo at once; atempo puts the tempo back
+        ["-af", f"asetrate=44100*{ratio:.6f},aresample=44100,"
+                f"atempo={1.0 / ratio:.6f}"],
+    ]
+    last = b""
+    for way in ways:
+        p = _run([ffmpeg(), "-y", "-v", "error", "-i", src, *way,
+                  "-c:a", "pcm_s16le", dst])
+        if p.returncode == 0 and os.path.isfile(dst):
+            return dst
+        last = p.stderr
+    raise AudioError(tr("Could not change the key:\n",
+                        "Не удалось сменить тональность:\n")
+                     + last.decode(errors="replace")[-400:])
+
+
 def read_pcm_mono(path: str, sample_rate: int = 16000,
                   af: Optional[str] = None) -> array:
     """Decode to mono int16 through a pipe. Returns array(\'h\')."""

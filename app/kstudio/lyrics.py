@@ -455,5 +455,39 @@ def decode_text(raw: bytes) -> str:
 
 
 def load(path: str) -> Lyrics:
+    """A file of words — or somebody else's finished karaoke.
+
+    An UltraStar file carries times and notes that took as long to make as
+    ours do, and there is no reason to ask for that work twice. It is read
+    where it is recognised; anything else is a page of words as before.
+    """
     with open(path, "rb") as f:
-        return parse(decode_text(f.read()))
+        text = decode_text(f.read())
+    from . import interop as IO
+    if IO.looks_ultrastar(text):
+        return from_record(IO.ultrastar_read(text))
+    return parse(text)
+
+
+def from_record(rec: dict) -> Lyrics:
+    """Lines already timed — from a saved song, or from another program."""
+    lyr = Lyrics(title=rec.get("title") or None, artist=rec.get("artist") or None)
+    for l in rec.get("lines") or []:
+        words = []
+        for w in l.get("words") or []:
+            wd = Word(w.get("w") or "", syllables=w.get("s") or 0)
+            wd.start = float(w.get("t") or 0.0)
+            wd.end = wd.start + float(w.get("d") or 0.0)
+            wd.glue = bool(w.get("g"))
+            if isinstance(w.get("n"), (int, float)):
+                wd.note = int(w["n"])
+            words.append(wd)
+        if not words:
+            continue
+        ln = Line(text=l.get("text") or " ".join(w.text for w in words),
+                  words=words, voice=int(l.get("voice") or 1),
+                  backing=bool(l.get("backing")))
+        ln.start, ln.end = words[0].start, words[-1].end
+        lyr.lines.append(ln)
+    lyr.has_manual_times = bool(lyr.lines)
+    return lyr

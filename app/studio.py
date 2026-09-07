@@ -625,7 +625,8 @@ class Handler(BaseHTTPRequestHandler):
                                     cover_dark=body.get("coverDark"),
                                     grid=body.get("grid"),
                                     dots_long=body.get("dotsLong"),
-                                    melody=body.get("melody"))
+                                    melody=body.get("melody"),
+                                    holds=body.get("holds"))
                 return self._json({"ok": True, "problems": P.problems(data)})
 
             m = re.match(r"^/api/project/([^/]+)/cover$", path)
@@ -1462,7 +1463,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                                   if data.get("coverBg") else None),
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")))
+                     melody=bool(data.get("melody")),
+                     holds=data.get("holds") is not False)
         log(tr(f"Done: {out}", f"Готово: {out}"))
         return {"kind": "html", "path": out}
 
@@ -1523,7 +1525,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
                                   if data.get("coverBg") else None),
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")))
+                     melody=bool(data.get("melody")),
+                     holds=data.get("holds") is not False)
         out = os.path.join(out_dir, base + ".mp4")
 
         class Args:
@@ -1535,6 +1538,9 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
         a.start = 0.0; a.seconds = float(opts.get("seconds", 0) or 0)
         a.audio = opts.get("audio", "minus"); a.timings = None; a.output = out
         a.intro = bool(opts.get("intro", True))   # the name and a count of three
+        # A key the singer can reach: the whole clip is moved at once, and the
+        # measured notes move with it, so the melody does not lie about the sound.
+        a.semitones = float(opts.get("semitones") or 0)
         # The clip behind the lyrics, if the song was given one. A missing
         # file is simply no backdrop: the still cover is still there.
         back = data.get("backdrop")
@@ -1547,7 +1553,8 @@ def export(folder: str, kind: str, opts: dict, log) -> dict:
         import tempfile
         tmpdir = tempfile.mkdtemp(prefix="karaoke_render_")
         try:
-            wav = video.extract_audio(payload, tmp_html, tmpdir, a.audio)
+            wav = video.extract_audio(payload, tmp_html, tmpdir, a.audio,
+                                      getattr(a, "semitones", 0))
             last = [""]
             def prog(msg):
                 if msg != last[0]:
@@ -1730,7 +1737,8 @@ def still_frame(folder: str, at: float, opening: bool = False) -> bytes:
                                   if data.get("coverBg") else None),
                      grid=data.get("grid"),
                      dots_long=bool(data.get("dotsLong")),
-                     melody=bool(data.get("melody")))
+                     melody=bool(data.get("melody")),
+                     holds=data.get("holds") is not False)
         payload = B.read_payload(page)
 
         class Args:

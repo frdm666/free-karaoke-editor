@@ -127,7 +127,8 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
                cover_paths: Optional[list] = None,
                grid: Optional[dict] = None,
                dots_long: bool = False,
-               melody: bool = False) -> str:
+               melody: bool = False,
+               holds: bool = True) -> str:
     """tracks: {\'mix\'|\'instrumental\'|\'vocals\': (path, mime)} → path to the HTML."""
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
@@ -183,6 +184,7 @@ def build_html(out_path: str, lyrics: Lyrics, duration: float,
         # a singer who wants the words plain should get them plain. Off unless
         # asked for; the notes are measured and kept either way.
         "melody": bool(melody),
+        "holds": bool(holds),
         "engineLabel": ENGINE_LABEL.get(engine, engine),
         "audio": audio,
         "data": {

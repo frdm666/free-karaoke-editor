@@ -7,6 +7,33 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.52.0
+
+**The key can be moved to one a singer can actually reach.** Choose a number
+of semitones when rendering and the whole clip is moved by it, once, over
+whatever mix came out — instrumental, instrumental with the original kept on
+marked stretches, or the whole recording. The tempo does not go with it: a key
+change is not a speed change. `rubberband` does the work where ffmpeg has it,
+and where it does not the old trick stands in — play the file at another rate
+and put the tempo back — which is coarser, and that is the honest price of not
+having the good filter. The measured notes move by the same amount, or the
+melody would be drawn a tone away from what comes out of the speakers. The
+frame says the key when it is not the recorded one, because a month later
+nobody remembers why the song sounds wrong.
+
+**Somebody else's karaoke can be read now, not only written.** An UltraStar
+file opens as a timed song: its beats become seconds through its own BPM and
+GAP, its notes come across, its syllables stay syllables, and a word nobody
+measured stays unmeasured rather than being given a plausible pitch. Months of
+work went into those files too, and asking for it twice is no kinder than
+losing it.
+
+**The bar on a wait inside a line moved off the word it was pointing at.** It
+sat under the word that would end the wait, which reads as an instruction to
+sing that word — and people sang it. It runs along the word just sung now, and
+across the space after it, arriving at the next word exactly as that word
+begins. It can also be turned off, along with the melody over the words.
+
 ## 4.51.0
 
 **The strip along the bottom is the song now, not a line filling up.** A dash

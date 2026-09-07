@@ -540,6 +540,29 @@ def main():
     check("when the singing comes back the mark is gone", done < 40,
           f"{done}, against {late} at the end of the wait")
 
+    # And it must not lie under the word that has not been sung yet: there it
+    # reads as an instruction to sing that word, and people sang it. So the
+    # bar, full at the end of the wait, must stop where that word begins.
+    at_end = hold_frame(6.1)              # the wait is all but over
+    after = hold_frame(6.35)              # that word is being sung now
+    We, He = at_end.size
+    pe = at_end.load()
+    # the bar: the run of sweep colour in its own band
+    bar_xs = [x for y in range(int(He * 0.46), int(He * 0.54))
+              for x in range(We)
+              if all(abs(pe[x, y][i] - video.COL_HOT[i]) < 46 for i in range(3))]
+    # the word: whatever lit up between the two frames, in the text band. Found
+    # by what changed rather than by colour, so it is that word and not the
+    # whole sung half of the line.
+    from PIL import ImageChops as _ICh
+    grew = _ICh.difference(at_end.crop((0, int(He * 0.34), We, int(He * 0.46))),
+                           after.crop((0, int(He * 0.34), We, int(He * 0.46))))
+    word_box = grew.getbbox()
+    check("the bar stops before the unsung word, not under it",
+          bar_xs and word_box and max(bar_xs) <= word_box[0] + 4,
+          f"bar ends {max(bar_xs) if bar_xs else None}, "
+          f"word starts {word_box[0] if word_box else None}")
+
     print("\nOne pause, one countdown")
     # The three guide dots count the seconds before a line. A wait long enough
     # also gets the panel at the top with the seconds and the bar — and both

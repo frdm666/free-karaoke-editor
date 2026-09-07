@@ -104,6 +104,102 @@ def ultrastar_text(data: Dict, audio_name: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def looks_ultrastar(text: str) -> bool:
+    """Is this an UltraStar file rather than a page of words?
+
+    Two things together, because either alone is thin: a header the format
+    always carries, and at least one note line. A song whose first line
+    happens to begin with a colon is not a karaoke file.
+    """
+    head = text[:4000].splitlines()
+    has_bpm = any(l.upper().startswith("#BPM") for l in head)
+    has_note = any(l[:2] in (": ", "* ", "F ", "R ", "G ") for l in head)
+    return has_bpm and has_note
+
+
+def ultrastar_read(text: str) -> dict:
+    """An UltraStar file back into lines, words and notes.
+
+    Months of somebody's work should not be locked into one program either
+    way round. Beats become seconds through the file's own BPM and GAP; a
+    note carries its pitch unless it is freestyle, which means nobody measured
+    one and we must not invent it. Syllables of one word are written without a
+    space between them, and that is how they are read back.
+    """
+    bpm, gap = 0.0, 0.0
+    title = artist = ""
+    voice = 1
+    lines: List[Dict] = []
+    cur: List[Dict] = []
+
+    def flush():
+        if not cur:
+            return
+        text_of = "".join(w["raw"] for w in cur).strip()
+        words = []
+        for k, w in enumerate(cur):
+            item = {"w": w["raw"].strip(), "t": round(w["t"], 3),
+                    "d": round(w["d"], 3), "s": 1}
+            if k and not cur[k - 1]["space"]:
+                item["g"] = True          # a syllable of the word before it
+            if w["note"] is not None:
+                item["n"] = int(w["note"])
+            if item["w"]:
+                words.append(item)
+        if words:
+            lines.append({"text": text_of, "start": words[0]["t"],
+                          "end": round(words[-1]["t"] + words[-1]["d"], 3),
+                          "voice": voice, "backing": False, "words": words})
+        cur.clear()
+
+    for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if not raw.strip():
+            continue
+        if raw.startswith("#"):
+            key, _, val = raw[1:].partition(":")
+            key, val = key.strip().upper(), val.strip()
+            if key == "BPM":
+                try:
+                    bpm = float(val.replace(",", "."))
+                except ValueError:
+                    bpm = 0.0
+            elif key == "GAP":
+                try:
+                    gap = float(val.replace(",", ".")) / 1000.0
+                except ValueError:
+                    gap = 0.0
+            elif key == "TITLE":
+                title = val
+            elif key == "ARTIST":
+                artist = val
+            continue
+        if raw[0] in "PE" and len(raw.strip()) <= 3:
+            flush()
+            if raw.upper().startswith("P"):
+                voice = 2 if raw.strip().upper() in ("P2", "P 2") else 1
+            continue
+        if raw.startswith("-"):
+            flush()
+            continue
+        if raw[:2] not in (": ", "* ", "F ", "R ", "G "):
+            continue
+        kind, rest = raw[0], raw[2:]
+        bits = rest.split(" ", 3)
+        if len(bits) < 4:
+            continue
+        try:
+            beat, length, pitch = float(bits[0]), float(bits[1]), float(bits[2])
+        except ValueError:
+            continue
+        tick = 60.0 / (bpm or US_BPM) / 4.0
+        word = bits[3]
+        cur.append({"raw": word, "t": gap + beat * tick, "d": max(length * tick, 0.01),
+                    "note": None if kind == "F" else pitch + 60,
+                    "space": word.endswith(" ")})
+    flush()
+    return {"title": title, "artist": artist, "lines": lines}
+
+
 def _ass_colour(hex_colour: str, fallback: str) -> str:
     """“#4de1ff” → “&H00FFE14D” — .ass wants blue-green-red, alpha first."""
     c = str(hex_colour or fallback).strip().lstrip("#")

@@ -338,6 +338,8 @@ const STR = {
     expQBest: "better and heavier",
     expQNorm: "the usual",
     expQLight: "lighter file",
+    expKey: "Key",
+    expKeyOrig: "as recorded",
     expIntroLbl: "the opening: the name and a count of three",
     expGo: "Render",
     swMore: "wheel…",
@@ -369,6 +371,11 @@ const STR = {
     sixteenths: "16ths",
     pulseOn: "pulse in the video",
     dotsLongOn: "dots on long waits",
+    holdsOn: "bar on waits in a line",
+    holdsHint: "A pause inside a line — a held note, an answer from the guitar "
+      + "— shows itself: a bar grows under the word that will end it, so the "
+      + "singer knows something is still coming and how near. Without it the "
+      + "sweep just stops, which reads like the end of the line.",
     melodyOn: "melody over the words",
     melodyHint: "Draw the melody over the words: a bar to a word, standing as "
       + "high as that word is sung. A map to sing by, never a score. Off by "
@@ -776,6 +783,8 @@ const STR = {
     expQBest: "лучше и тяжелее",
     expQNorm: "обычное",
     expQLight: "полегче файл",
+    expKey: "Тональность",
+    expKeyOrig: "как в записи",
     expIntroLbl: "заставка: название и счёт до трёх",
     expGo: "Рендерить",
     swMore: "круг…",
@@ -807,6 +816,11 @@ const STR = {
     sixteenths: "16-е",
     pulseOn: "пульс в ролике",
     dotsLongOn: "точки и на долгих паузах",
+    holdsOn: "полоска пауз в строке",
+    holdsHint: "Пауза внутри строки — тянутая нота, ответ гитары — показывает "
+      + "себя: под словом, которое её закончит, растёт полоска, и певец знает, "
+      + "что продолжение будет и насколько близко. Без неё заливка просто "
+      + "останавливается, а это читается как конец строки.",
     melodyOn: "мелодия над словами",
     melodyHint: "Рисовать мелодию над словами: столбик над каждым словом на "
       + "той высоте, на какой оно поётся. Карта, по которой поют, и никогда "
@@ -1767,6 +1781,7 @@ async function openProject(id){
   showGrid();
   $("chkDotsLong").checked = !!data.dotsLong;
   $("chkMelody").checked = !!data.melody;
+  $("chkHolds").checked = data.holds !== false;
   colors = (Array.isArray(data.colors) && data.colors.length === 2)
     ? data.colors.slice() : ["#4de1ff", "#ff8ad1"];
   theme = (Array.isArray(data.theme) && data.theme.length === 2)
@@ -2483,7 +2498,8 @@ async function saveNow(){
        grid: (data && data.grid) ? data.grid : undefined,
        dotsLong: (data && data.dotsLong !== undefined)
                  ? !!data.dotsLong : undefined,
-       melody: (data && data.melody !== undefined) ? !!data.melody : undefined});
+       melody: (data && data.melody !== undefined) ? !!data.melody : undefined,
+       holds: (data && data.holds !== undefined) ? !!data.holds : undefined});
     showProblems(r.problems);
     saveState("ok", T.savedOk);
   }catch(e){
@@ -3611,6 +3627,12 @@ $("chkSixteen").addEventListener("change", () => {
 // grid on the timeline and want nothing of it in the clip, or the other way.
 // Two countdowns over one pause say the same thing twice. The dots stand down
 // on a wait the panel at the top is already counting — unless asked otherwise.
+$("chkHolds").addEventListener("change", () => {
+  if (!data) return;
+  data.holds = $("chkHolds").checked;
+  touched();
+  if (!$("stillBox").classList.contains("hide")) showStill(stillT, false);
+});
 $("chkMelody").addEventListener("change", () => {
   if (!data) return;
   data.melody = $("chkMelody").checked;
@@ -4152,6 +4174,9 @@ $("btnExportMp4").addEventListener("click", () => {
     if (saved.fps) $("expFps").value = saved.fps;
     if (saved.q) $("expQ").value = saved.q;
     if (saved.intro != null) $("expIntro").checked = !!saved.intro;
+    // The key is not remembered between songs: it belongs to one throat and
+    // one song, and a forgotten +3 would quietly retune the next one.
+    $("expKey").value = "0";
   }catch(e){}
   $("expDlg").classList.remove("hide");
 });
@@ -4164,7 +4189,8 @@ $("btnExpGo").addEventListener("click", async () => {
   const [w, h] = $("expSize").value.split("x").map(Number);
   const opts = {kind: "mp4", width: w, height: h,
                 fps: +$("expFps").value, crf: +$("expQ").value,
-                intro: $("expIntro").checked};
+                intro: $("expIntro").checked,
+                semitones: +$("expKey").value || 0};
   try{
     localStorage.setItem("mp4opts", JSON.stringify({size: $("expSize").value,
       fps: $("expFps").value, q: $("expQ").value, intro: $("expIntro").checked}));

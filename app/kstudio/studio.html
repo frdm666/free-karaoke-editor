@@ -771,6 +771,9 @@
       <label class="chk" data-tt="pulseHint"
              title="Show the beat in the video as four quiet dots in the corner"><input
              type="checkbox" id="chkPulse"> <span data-t="pulseOn">pulse in the video</span></label>
+      <label class="chk" data-tt="holdsHint"
+             title="A bar filling under the word that ends a pause inside a line"><input
+             type="checkbox" id="chkHolds" checked> <span data-t="holdsOn">bar on waits in a line</span></label>
       <label class="chk" data-tt="melodyHint"
              title="Draw the melody over the words: a bar to a word, as high as it is sung"><input
              type="checkbox" id="chkMelody"> <span data-t="melodyOn">melody over the words</span></label>
@@ -842,6 +845,19 @@
         <option value="18" data-t="expQBest">better and heavier</option>
         <option value="20" selected data-t="expQNorm">the usual</option>
         <option value="24" data-t="expQLight">lighter file</option>
+      </select></div>
+    <!-- Not every song sits where a given throat can reach it. The whole clip
+         is moved at once, and the frame says so, because a month later nobody
+         remembers why the song sounds unlike the record. -->
+    <div class="row"><label data-t="expKey">Key</label>
+      <select id="expKey">
+        <option value="-5">-5</option><option value="-4">-4</option>
+        <option value="-3">-3</option><option value="-2">-2</option>
+        <option value="-1">-1</option>
+        <option value="0" selected data-t="expKeyOrig">as recorded</option>
+        <option value="1">+1</option><option value="2">+2</option>
+        <option value="3">+3</option><option value="4">+4</option>
+        <option value="5">+5</option>
       </select></div>
     <label class="knob"><input type="checkbox" id="expIntro" checked>
       <span data-t="expIntroLbl">the opening: the name and a count of three</span></label>
