@@ -1270,8 +1270,8 @@ def main():
     print("\nThe countdown waits for a real pause")
     # A five-second gap between lines is a breath, not an interlude, and a
     # countdown over it pulls the eye off the singing for nothing.
-    ui = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "kstudio", "ui.js"), encoding="utf-8").read()
+    from kstudio import ui as UI
+    ui = UI.script()
     m = re.search(r"const MIN_GAP = ([\d.]+)", ui)
     check("the studio waits ten seconds before counting down",
           m and float(m.group(1)) >= 10.0, m.group(1) if m else "not found")

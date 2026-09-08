@@ -7,6 +7,33 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.57.0
+
+**A tidy-up of the code, asked for and given in full.** Nothing here changes
+what the program does; all of it changes how the code reads. One thing was a
+fault: on Windows a path written into `yt-dlp-args` — `C:\Users\me\cookies.txt`
+— lost its backslashes on the way to the downloader, which then looked for a
+file that never existed. It is kept whole now.
+
+The rest is repetition undone. The loop that asks YouTube as one client after
+another stood twice; the row that takes a link for a cover and the one for a
+clip were the same twenty lines; a track named in a page was turned into a
+file by the video and by the diagnosis each in their own words; the words of
+a line were grouped by the silence between them in two places; and
+`settings.ini` had five readers, each with its own idea of what a comment is.
+Each of those is one now, and the settings reader is a module of its own.
+
+The window's server answered three hundred lines of `if path == …` in two
+handlers with the same `try/except` at the end of each; it is a table of
+routes, one decorator and one method per endpoint. The setup's seven steps are
+seven functions. The video's fonts are a small class instead of two closures,
+and the fade and the name in the corner stepped out of the render into
+functions of their own. And `ui.js`, four thousand lines in one file, lies as
+sixteen files, one per part of the window, joined into the one script the
+browser always received.
+
+---
+
 ## 4.56.0
 
 **A locked video is answered with the line to write, not with where to read

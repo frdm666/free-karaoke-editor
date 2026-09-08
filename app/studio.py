@@ -44,6 +44,7 @@ from kstudio import lang as LG            # noqa: E402
 from kstudio import project as P           # noqa: E402
 from kstudio import separate as S          # noqa: E402
 from kstudio import settings as SET        # noqa: E402
+from kstudio import ui as JS               # noqa: E402
 
 UI = os.path.join(ROOT, "kstudio", "studio.html")
 PROJECTS = P.projects_root()
@@ -412,9 +413,10 @@ class Handler(BaseHTTPRequestHandler):
 
     @route("GET", r"^/ui\.js$")
     def get_ui_js(self, m, q, body):
-        with open(os.path.join(ROOT, "kstudio", "ui.js"), "rb") as f:
-            return self._send(200, f.read(),
-                              "application/javascript; charset=utf-8")
+        # written as parts, one per piece of the window; loaded as the one
+        # script it always was
+        return self._send(200, JS.script().encode("utf-8"),
+                          "application/javascript; charset=utf-8")
 
     @route("GET", r"^/api/state$")
     def get_state(self, m, q, body):

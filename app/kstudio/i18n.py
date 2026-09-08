@@ -1,6 +1,6 @@
 """Language of the program's own messages.
 
-Window labels live in a dictionary inside ui.js; everything the program prints
+Window labels live in a dictionary in kstudio/ui/00-strings.js; everything the program prints
 to the console and to the build log lives right here in the code. Both variants
 sit next to each other, so a message is never translated blindly:
 
