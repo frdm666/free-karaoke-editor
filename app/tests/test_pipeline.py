@@ -1717,6 +1717,23 @@ def main():
         "studio_mod", os.path.join(_app_dir, "studio.py"))
     _st = _iu.module_from_spec(_sp2)
     _sp2.loader.exec_module(_st)
+    # The window's server answers from a table of routes now, not from three
+    # hundred lines of ifs; the table has to be whole and free of doubles.
+    pats = [rx.pattern for rx, _, _ in _st.ROUTES["GET"] + _st.ROUTES["POST"]]
+    check("no two routes claim the same path", len(pats) == len(set(pats)),
+          [p for p in pats if pats.count(p) > 1])
+    check("every endpoint the window calls is in the table",
+          all(any(re.compile(p).match(path) for p in pats)
+              for path in ("/", "/ui.js", "/api/state", "/api/job", "/api/browse",
+                           "/api/project/x", "/api/project/x/still",
+                           "/api/project/x/audio/mix", "/api/upload", "/api/fetch",
+                           "/api/new", "/api/project/x/timings", "/api/project/x/cover",
+                           "/api/project/x/backdrop", "/api/project/x/pack",
+                           "/api/unpack", "/api/project/x/delete",
+                           "/api/project/x/track", "/api/project/x/realign-part",
+                           "/api/project/x/realign", "/api/project/x/export")))
+    check("only the upload takes its body raw",
+          [fn.__name__ for _, fn, raw in _st.ROUTES["POST"] if raw] == ["post_upload"])
     round_trip = _st._lyrics_from({"lines": saved})
     check("and read back from it",
           [w.note for w in round_trip.lines[0].words] == tune,
@@ -2758,16 +2775,22 @@ def main():
 
     # A person who knows where their copy is should be able to say so without
     # setting an environment variable for a double-clicked window.
-    _real_setting = FE._setting
-    FE._setting = lambda *names: "/somewhere/of/my/own/yt-dlp"
+    own_ini = os.path.join(tempfile.mkdtemp(prefix="karaoke_own_"), "settings.ini")
+    open(own_ini, "w", encoding="utf-8").write("yt-dlp = /somewhere/of/my/own/yt-dlp\n")
     was = os.environ.pop("KARAOKE_YTDLP", None)
+    was_ini = os.environ.get("KARAOKE_SETTINGS")
+    os.environ["KARAOKE_SETTINGS"] = own_ini
     try:
         check("a path written in the settings is the one that is used",
               FE.tool() == ["/somewhere/of/my/own/yt-dlp"], FE.tool())
     finally:
-        FE._setting = _real_setting
         if was is not None:
             os.environ["KARAOKE_YTDLP"] = was
+        if was_ini is None:
+            del os.environ["KARAOKE_SETTINGS"]
+        else:
+            os.environ["KARAOKE_SETTINGS"] = was_ini
+    shutil_rm(os.path.dirname(own_ini))
     folders = FE.places()
     check("and no folder is searched twice",
           len(folders) == len(set(folders)), len(folders))

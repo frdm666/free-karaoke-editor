@@ -12,7 +12,6 @@ The settings come from settings.ini next to karaoke.py, if there is one.
 from __future__ import annotations
 
 import os
-import re
 import sys
 import time
 
@@ -20,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from kstudio.i18n import tr          # noqa: E402
+from kstudio import settings as SET  # noqa: E402
 
 import karaoke  # noqa: E402
 
@@ -30,10 +30,7 @@ TEXT_EXT = {".txt", ".lrc"}
 # arrive as mojibake. The old name is still read if it survived from before.
 HOME = os.path.dirname(ROOT)
 # Settings live next to the program; earlier locations are read as a fallback.
-SETTINGS = os.environ.get("KARAOKE_SETTINGS") or os.path.join(ROOT, "settings.ini")
-for _other in (os.path.join(HOME, "settings.ini"), os.path.join(HOME, "настройки.ini")):
-    if not os.path.isfile(SETTINGS) and os.path.isfile(_other):
-        SETTINGS = _other
+SETTINGS = SET.path() or os.path.join(ROOT, "settings.ini")
 
 # settings key → command-line option
 KEYS = {
@@ -60,32 +57,17 @@ NO = {"нет", "no", "n", "0", "false", "выкл", "off"}
 def read_settings() -> list:
     """settings.ini → a list of command-line arguments."""
     args: list = []
-    if not os.path.isfile(SETTINGS):
-        return args
-    with open(SETTINGS, encoding="utf-8-sig") as f:
-        for raw in f:
-            # “#” starts a comment, but a colour is written with “#” too, and
-            # “colors = #4de1ff,#ff8ad1” must not be read as a comment.
-            line = raw.strip()
-            if line.startswith("#"):
-                continue
-            line = re.sub(r"\s+#(?![0-9A-Fa-f]{3,8}\b).*$", "", line).strip()
-            if not line or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            key, val = key.strip().lower(), val.strip()
-            if not val:
-                continue
-            if key in KEYS:
-                # “авто” is how “auto” is written in Russian settings files
-                if KEYS[key] in ("--lang", "--ui-lang") and \
-                        val.lower() in ("авто", "auto", "сам"):
-                    val = "auto"
-                args += [KEYS[key], val]
-            elif key in FLAGS and val.lower() in NO:
-                args.append(FLAGS[key])
-            elif key == "lrc" and val.lower() in YES:
-                args.append("--lrc")
+    for key, val in SET.read(SETTINGS).items():
+        if key in KEYS:
+            # “авто” is how “auto” is written in Russian settings files
+            if KEYS[key] in ("--lang", "--ui-lang") and \
+                    val.lower() in ("авто", "auto", "сам"):
+                val = "auto"
+            args += [KEYS[key], val]
+        elif key in FLAGS and val.lower() in NO:
+            args.append(FLAGS[key])
+        elif key == "lrc" and val.lower() in YES:
+            args.append("--lrc")
     return args
 
 

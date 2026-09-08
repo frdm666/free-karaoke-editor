@@ -22,6 +22,7 @@ import time
 from typing import Callable, Optional
 
 from . import audio as AU
+from . import settings as SET
 from .i18n import tr
 
 # A download that never ends is worse than one that fails: the window would sit
@@ -66,28 +67,6 @@ class FetchError(RuntimeError):
     pass
 
 
-def _setting(*names) -> str:
-    """One value out of settings.ini, by any of the names it may go under."""
-    app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    want = {n.lower() for n in names}
-    for ini in (os.path.join(app, "settings.ini"),
-                os.path.join(os.path.dirname(app), "settings.ini")):
-        try:
-            with open(ini, encoding="utf-8-sig") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("#") or "=" not in line:
-                        continue
-                    key, _, val = line.partition("=")
-                    if key.strip().lower() in want:
-                        got = val.strip()
-                        if got:
-                            return got
-        except OSError:
-            continue
-    return ""
-
-
 def extra_args() -> list:
     """Whatever the person adds to the downloader themselves.
 
@@ -97,7 +76,7 @@ def extra_args() -> list:
         yt-dlp-args = --cookies-from-browser firefox
     """
     raw = ((os.environ.get("KARAOKE_YTDLP_ARGS") or "").strip()
-           or _setting("yt-dlp-args", "ключи-загрузчика"))
+           or SET.get("yt-dlp-args", "ключи-загрузчика"))
     return _split_args(raw, os.name == "nt")
 
 
@@ -260,7 +239,7 @@ def tool() -> Optional[list]:
     own = (os.environ.get("KARAOKE_YTDLP") or "").strip()
     if not own:
         # …and settings.ini says the same thing without an environment to set.
-        own = _setting("yt-dlp", "загрузчик")
+        own = SET.get("yt-dlp", "загрузчик")
     if own:
         own = os.path.expanduser(own)
         return [own]

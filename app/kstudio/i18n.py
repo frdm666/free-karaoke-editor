@@ -14,30 +14,19 @@ from __future__ import annotations
 
 import os
 
+from . import settings as SET
+
 _LANG = None
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Settings and songs live next to the program folder, not inside it: the root
-# holds only what a person actually needs.
-HOME = os.path.dirname(ROOT)
 
 
 def _from_settings() -> str:
-    for path in (os.path.join(ROOT, "settings.ini"),
-                 os.path.join(HOME, "settings.ini"),
-                 os.path.join(HOME, "настройки.ini")):
-        try:
-            with open(path, encoding="utf-8-sig") as f:
-                for raw in f:
-                    line = raw.strip()
-                    if line.startswith("#") or "=" not in line:
-                        continue
-                    key, _, val = line.partition("=")
-                    if key.strip().lower() in ("надписи", "ui-lang", "language"):
-                        val = val.split("#")[0].strip().lower()
-                        if val in ("ru", "en"):
-                            return val
-        except OSError:
-            continue
+    # The language of the labels first; failing that, the language of the
+    # lyrics — a settings file that says the song is Russian has said enough.
+    got = SET.read()
+    for name in ("надписи", "ui-lang", "language"):
+        val = (got.get(name) or "").lower()
+        if val in ("ru", "en"):
+            return val
     return ""
 
 

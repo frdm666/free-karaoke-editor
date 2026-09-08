@@ -343,6 +343,39 @@ def main():
           all(k in setup.ALSO_KNOWN for k in ru_keys),
           [k for k in ru_keys if k not in setup.ALSO_KNOWN])
 
+    # Five places used to read settings.ini, each with its own loop and its
+    # own idea of what a comment is. One reader now, and this is its contract.
+    from kstudio import settings as SET
+    one = os.path.join(tmp, "one.ini")
+    open(one, "w", encoding="utf-8").write(
+        "# a comment line\n"
+        "colors = #4de1ff,#ff8ad1  # the two voices\n"
+        "Движок = energy\n"
+        "yt-dlp-args = --cookies-from-browser firefox # my browser\n"
+        "empty =\n"
+        "no equals sign here\n")
+    got = SET.read(one)
+    check("a colour after “=” is a value, the words after it a comment",
+          got.get("colors") == "#4de1ff,#ff8ad1", got.get("colors"))
+    check("keys are lowered, values keep their case",
+          got.get("движок") == "energy" and "Движок" not in got, sorted(got))
+    check("a trailing comment is cut off a value",
+          got.get("yt-dlp-args") == "--cookies-from-browser firefox", got.get("yt-dlp-args"))
+    check("an empty value is no value", "empty" not in got, sorted(got))
+    check("a file that is not there reads as nothing",
+          SET.read(os.path.join(tmp, "nowhere.ini")) == {})
+    was = os.environ.get("KARAOKE_SETTINGS")
+    os.environ["KARAOKE_SETTINGS"] = one
+    try:
+        check("KARAOKE_SETTINGS names the file outright", SET.path() == one, SET.path())
+        check("and a value is found under any of its names",
+              SET.get("align", "движок") == "energy" and SET.get("nothing", "такого-нет") == "")
+    finally:
+        if was is None:
+            del os.environ["KARAOKE_SETTINGS"]
+        else:
+            os.environ["KARAOKE_SETTINGS"] = was
+
     print("\nWhen something falls over")
     # A console window scrolls and the error is gone — that is exactly what
     # happened to a real report: “an error flashed by, I did not see which”.

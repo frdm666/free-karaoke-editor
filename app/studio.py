@@ -43,6 +43,7 @@ from kstudio import findlyrics as FL       # noqa: E402
 from kstudio import lang as LG            # noqa: E402
 from kstudio import project as P           # noqa: E402
 from kstudio import separate as S          # noqa: E402
+from kstudio import settings as SET        # noqa: E402
 
 UI = os.path.join(ROOT, "kstudio", "studio.html")
 PROJECTS = P.projects_root()
@@ -208,26 +209,8 @@ def ui_lang() -> str:
     val = (os.environ.get("KARAOKE_UI_LANG") or "").strip().lower()
     if val in ("en", "ru"):
         return val
-    home = os.path.dirname(ROOT)
-    ini = os.path.join(ROOT, "settings.ini")
-    for other in (os.path.join(home, "settings.ini"),
-                  os.path.join(home, "настройки.ini")):   # places from older versions
-        if not os.path.isfile(ini) and os.path.isfile(other):
-            ini = other
-    try:
-        with open(ini, encoding="utf-8-sig") as f:
-            for raw in f:
-                line = raw.strip()
-                if line.startswith("#") or "=" not in line:
-                    continue
-                key, _, v = line.partition("=")
-                if key.strip().lower() in ("надписи", "ui-lang"):
-                    v = v.split("#")[0].strip().lower()
-                    if v in ("en", "ru"):
-                        return v
-    except OSError:
-        pass
-    return "auto"
+    val = SET.get("надписи", "ui-lang").lower()
+    return val if val in ("en", "ru") else "auto"
 
 
 def make_report(audio: str, lyrics_path: str, opts: dict) -> dict:
@@ -267,6 +250,19 @@ def downloaded_models() -> dict:
     """
     from kstudio import models as M
     return M.whisper_all()
+
+
+# The routes: a pattern, the method that answers it, and whether the body is
+# taken raw. Tried in order, so a plain path is listed before a pattern that
+# could swallow it. Adding an endpoint is one decorator and one method.
+ROUTES: dict = {"GET": [], "POST": []}
+
+
+def route(method: str, pattern: str, raw: bool = False):
+    def deco(fn):
+        ROUTES[method].append((re.compile(pattern), fn, raw))
+        return fn
+    return deco
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -365,91 +361,33 @@ class Handler(BaseHTTPRequestHandler):
         if want in ("en", "ru"):
             i18n.set_lang(want)
 
+    # ---------------- answering ----------------
+    # Both verbs walk the same road: the language, the “this computer only”
+    # gate, the path and the query, the table of routes, and one answer for
+    # whatever a route threw. The two used to carry all of it each, three
+    # hundred lines of ifs between them, with the same try/except at the end.
+
     def do_GET(self):
+        self._dispatch("GET")
+
+    def do_POST(self):
+        self._dispatch("POST")
+
+    def _dispatch(self, method: str):
         self._pick_lang()
         u = urlparse(self.path)
         if not self._local():
             return self._err(403, tr("this computer only", "только с этого компьютера"))
         path, q = dec_path(u.path), parse_qs(u.query)
         try:
-            if path in ("/", "/index.html"):
-                # Language of the window labels: from settings, otherwise from
-                # the system. The button in the window still overrides it.
-                with open(UI, encoding="utf-8") as f:
-                    page = f.read().replace("__UI_LANG__", ui_lang())
-                return self._send(200, page.encode("utf-8"),
-                                  "text/html; charset=utf-8")
-
-            if path == "/ui.js":
-                with open(os.path.join(ROOT, "kstudio", "ui.js"), "rb") as f:
-                    return self._send(200, f.read(),
-                                      "application/javascript; charset=utf-8")
-
-            if path == "/api/state":
-                return self._json({"projects": P.list_all(PROJECTS),
-                                   "uiLangs": extra_langs(),
-                                   "caps": capabilities(),
-                                   "projectsDir": PROJECTS})
-
-            if path == "/api/job":
-                with JOBS_LOCK:
-                    job = JOBS.get(q.get("id", [""])[0])
-                    return self._json(job or {"error": tr("no such task", "нет такой задачи")})
-
-            if path == "/api/messages":
-                # Extra languages live as JSON files next to the code, so adding
-                # one needs no rebuild and no programming.
-                code = (q.get("lang", [""])[0] or "").lower()
-                if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]+)?", code):
-                    return self._err(400, tr("bad language code", "неверный код языка"))
-                path_json = os.path.join(ROOT, "kstudio", "messages", code + ".json")
-                if not os.path.isfile(path_json):
-                    return self._json({})
-                try:
-                    with open(path_json, encoding="utf-8") as f:
-                        return self._json(json.load(f))
-                except (OSError, ValueError) as e:
-                    return self._err(400, str(e))
-
-            if path == "/api/browse":
-                raw = q.get("path", [""])[0]
-                try:
-                    raw = raw.encode("latin-1").decode("utf-8")
-                except (UnicodeEncodeError, UnicodeDecodeError):
-                    pass
-                return self._json(browse(raw, q.get("kind", ["audio"])[0]))
-
-            m = re.match(r"^/api/project/([^/]+)$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                data = P.load(folder)
-                data["problems"] = P.problems(data)
-                data["quiet"] = P.quiet_spans(data)
-                data["id"] = m.group(1)
-                return self._json(data)
-
-            m = re.match(r"^/api/project/([^/]+)/still$", path)
-            if m:
-                try:
-                    at = float(q.get("at", ["0"])[0])
-                except ValueError:
-                    at = 0.0
-                try:
-                    png = still_frame(project_dir(m.group(1)), at,
-                                      opening=q.get("opening", [""])[0] == "1")
-                except Exception as e:
-                    return self._err(400, str(e))
-                return self._send(200, png, "image/png")
-
-            m = re.match(r"^/api/project/([^/]+)/audio/([a-z]+)$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                tracks = P.load(folder).get("tracks") or {}
-                name = tracks.get(m.group(2))
-                if not name:
-                    return self._err(404, tr("no such track", "нет такой дорожки"))
-                return self._file(os.path.join(folder, name))
-
+            for rx, fn, raw in ROUTES[method]:
+                m = rx.match(path)
+                if not m:
+                    continue
+                # a POST carries JSON, except the upload, which takes its
+                # bytes as they are
+                body = self._body() if method == "POST" and not raw else None
+                return fn(self, m, q, body)
             return self._err(404, tr("not found", "не найдено"))
         except FileNotFoundError as e:
             # Not every missing file means a missing project: any such error
@@ -460,6 +398,383 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             self._err(500, str(e))
+
+    # ---------------- GET ----------------
+
+    @route("GET", r"^/(index\.html)?$")
+    def get_index(self, m, q, body):
+        # Language of the window labels: from settings, otherwise from
+        # the system. The button in the window still overrides it.
+        with open(UI, encoding="utf-8") as f:
+            page = f.read().replace("__UI_LANG__", ui_lang())
+        return self._send(200, page.encode("utf-8"),
+                          "text/html; charset=utf-8")
+
+    @route("GET", r"^/ui\.js$")
+    def get_ui_js(self, m, q, body):
+        with open(os.path.join(ROOT, "kstudio", "ui.js"), "rb") as f:
+            return self._send(200, f.read(),
+                              "application/javascript; charset=utf-8")
+
+    @route("GET", r"^/api/state$")
+    def get_state(self, m, q, body):
+        return self._json({"projects": P.list_all(PROJECTS),
+                           "uiLangs": extra_langs(),
+                           "caps": capabilities(),
+                           "projectsDir": PROJECTS})
+
+    @route("GET", r"^/api/job$")
+    def get_job(self, m, q, body):
+        with JOBS_LOCK:
+            job = JOBS.get(q.get("id", [""])[0])
+            return self._json(job or {"error": tr("no such task", "нет такой задачи")})
+
+    @route("GET", r"^/api/messages$")
+    def get_messages(self, m, q, body):
+        # Extra languages live as JSON files next to the code, so adding
+        # one needs no rebuild and no programming.
+        code = (q.get("lang", [""])[0] or "").lower()
+        if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]+)?", code):
+            return self._err(400, tr("bad language code", "неверный код языка"))
+        path_json = os.path.join(ROOT, "kstudio", "messages", code + ".json")
+        if not os.path.isfile(path_json):
+            return self._json({})
+        try:
+            with open(path_json, encoding="utf-8") as f:
+                return self._json(json.load(f))
+        except (OSError, ValueError) as e:
+            return self._err(400, str(e))
+
+    @route("GET", r"^/api/browse$")
+    def get_browse(self, m, q, body):
+        raw = q.get("path", [""])[0]
+        try:
+            raw = raw.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        return self._json(browse(raw, q.get("kind", ["audio"])[0]))
+
+    @route("GET", r"^/api/project/([^/]+)$")
+    def get_project(self, m, q, body):
+        folder = project_dir(m.group(1))
+        data = P.load(folder)
+        data["problems"] = P.problems(data)
+        data["quiet"] = P.quiet_spans(data)
+        data["id"] = m.group(1)
+        return self._json(data)
+
+    @route("GET", r"^/api/project/([^/]+)/still$")
+    def get_still(self, m, q, body):
+        try:
+            at = float(q.get("at", ["0"])[0])
+        except ValueError:
+            at = 0.0
+        try:
+            png = still_frame(project_dir(m.group(1)), at,
+                              opening=q.get("opening", [""])[0] == "1")
+        except Exception as e:
+            return self._err(400, str(e))
+        return self._send(200, png, "image/png")
+
+    @route("GET", r"^/api/project/([^/]+)/audio/([a-z]+)$")
+    def get_audio(self, m, q, body):
+        folder = project_dir(m.group(1))
+        tracks = P.load(folder).get("tracks") or {}
+        name = tracks.get(m.group(2))
+        if not name:
+            return self._err(404, tr("no such track", "нет такой дорожки"))
+        return self._file(os.path.join(folder, name))
+
+    # ---------------- POST ----------------
+
+    @route("POST", r"^/api/upload$", raw=True)
+    def post_upload(self, m, q, body):
+        return self._upload(q)
+
+    @route("POST", r"^/api/reveal$")
+    def post_reveal(self, m, q, body):
+        # Show the finished file in the file manager. Otherwise it has
+        # to be hunted for — it sits next to the original song.
+        target = body.get("path", "")
+        if not os.path.exists(target):
+            return self._err(404, tr("the file is gone: ", "файла уже нет: ") + target)
+        try:
+            reveal(target)
+            return self._json({"ok": True})
+        except Exception as e:
+            return self._err(500, tr(f"could not open the folder: {e}", f"не вышло открыть папку: {e}"))
+
+    @route("POST", r"^/api/report$")
+    def post_report(self, m, q, body):
+        # The report before building: the song, the text, what to expect.
+        audio, lyrics = body.get("audio", ""), body.get("lyrics", "")
+        for f in (audio, lyrics):
+            if not os.path.isfile(f):
+                return self._err(400, tr(f"file not found: {f}", f"файл не найден: {f}"))
+        try:
+            return self._json(make_report(audio, lyrics, body))
+        except Exception as e:
+            return self._err(400, tr(f"could not make sense of the files: {e}", f"не вышло разобрать файлы: {e}"))
+
+    @route("POST", r"^/api/fetch$")
+    def post_fetch(self, m, q, body):
+        # The sound from a link. It is a long job with a log of its
+        # own: a download can take a minute and can fail halfway.
+        url = (body.get("url") or "").strip()
+        try:
+            FE.check_url(url)
+        except FE.FetchError as e:
+            return self._err(400, str(e))
+        if not FE.available():
+            return self._err(400, FE.how_to_install())
+        jid = start_job(tr("Taking the sound from the link",
+                           "Достаю звук по ссылке"),
+                        lambda log: FE.download(url, incoming_dir(), log))
+        return self._json({"job": jid})
+
+    @route("POST", r"^/api/lyrics/find$")
+    def post_lyrics_find(self, m, q, body):
+        # A suggestion, not an answer: the words are shown to be read
+        # before they are used.
+        try:
+            found = FL.search(body.get("track", ""), body.get("artist", ""),
+                              float(body.get("duration") or 0))
+        except FL.LyricsError as e:
+            return self._err(400, str(e))
+        except Exception as e:
+            return self._err(400, str(e))
+        return self._json({"source": FL.SOURCE, "found": found})
+
+    @route("POST", r"^/api/lyrics/save$")
+    def post_lyrics_save(self, m, q, body):
+        # Lyrics pasted into the window. Everything downstream works
+        # with a file on disk, so this makes one.
+        text = (body.get("text") or "").strip()
+        if not text:
+            return self._err(400, tr("the lyrics are empty", "текст пустой"))
+        if len(text) > 400_000:
+            return self._err(413, tr("that is too much text for a song",
+                                     "для песни это слишком много текста"))
+        stem = re.sub(r'[<>:"|?*\\/\x00-\x1f]', "_",
+                      (body.get("name") or "").strip())[:60].strip() or "lyrics"
+        dst = os.path.join(incoming_dir(), stem + ".txt")
+        base, n = dst[:-4], 2
+        while os.path.exists(dst):
+            dst = f"{base}-{n}.txt"
+            n += 1
+        with open(dst, "w", encoding="utf-8") as f:
+            f.write(text.replace("\r\n", "\n").rstrip() + "\n")
+        return self._json({"path": dst, "name": os.path.basename(dst)})
+
+    @route("POST", r"^/api/new$")
+    def post_new(self, m, q, body):
+        audio, lyrics = body.get("audio", ""), body.get("lyrics", "")
+        for f in (audio, lyrics):
+            if not os.path.isfile(f):
+                return self._err(400, tr(f"file not found: {f}", f"файл не найден: {f}"))
+        opts = dict(align_engine=body.get("align", "auto"),
+                    whisper_model=body.get("model", "small"),
+                    language=body.get("lang", "auto"),
+                    separate=bool(body.get("separate", True)),
+                    skip=body.get("noText") or "",
+                    # four passes instead of one: a cleaner voice, and
+                    # the timing is made from the voice
+                    separator=("htdemucs_ft"
+                               if body.get("separator") == "htdemucs_ft"
+                               else "htdemucs"),
+                    # a song taken from a link knows its own name;
+                    # the file it landed in is called something safe
+                    title=body.get("title") or "",
+                    artist=body.get("artist") or "",
+                    # typed into the field, not taken from a file name
+                    title_set=bool(body.get("titleSet")),
+                    # the clip's cover as the backdrop, if asked for
+                    cover=body.get("cover") or None,
+                    cover_bg=bool(body.get("coverBg")))
+        jid = start_job(tr("Building the song", "Собираю песню"), lambda log: os.path.basename(
+            P.create(audio, lyrics, PROJECTS, log=log, **opts)))
+        return self._json({"job": jid})
+
+    @route("POST", r"^/api/project/([^/]+)/timings$")
+    def post_timings(self, m, q, body):
+        folder = project_dir(m.group(1))
+        lines = body.get("lines")
+        if not isinstance(lines, list):
+            return self._err(400, tr("no lines", "нет строк"))
+        data = P.save_lines(folder, lines, colors=body.get("colors"),
+                            theme=body.get("theme"),
+                            no_text=body.get("noText"),
+                            keep_marks=body.get("keepMarks"),
+                            check_off=body.get("checkOff"),
+                            title=body.get("title"),
+                            artist=body.get("artist"),
+                            cover_dark=body.get("coverDark"),
+                            grid=body.get("grid"),
+                            dots_long=body.get("dotsLong"),
+                            melody=body.get("melody"),
+                            holds=body.get("holds"),
+                            trim=body.get("trim"))
+        return self._json({"ok": True, "problems": P.problems(data)})
+
+    @route("POST", r"^/api/project/([^/]+)/cover$")
+    def post_cover(self, m, q, body):
+        folder = project_dir(m.group(1))
+        data = P.load(folder)
+        if body.get("remove"):
+            # back to the woven gradient — the cover files go too
+            for name in ["cover.jpg"] + [n for n in os.listdir(folder)
+                                         if n.startswith("cover-")
+                                         and n.endswith(".jpg")]:
+                try:
+                    os.remove(os.path.join(folder, name))
+                except OSError:
+                    pass
+            data["cover"] = None
+            data["coverBg"] = False
+            data["coverSet"] = None
+            P.save(folder, data)
+            return self._json({"ok": True, "cover": False})
+        src = (body.get("path") or body.get("url") or "").strip()
+        tmp_dl = None
+        if re.match(r"^https?://", src):
+            # a link to a picture: fetched here, sized within reason,
+            # and treated like any file from then on
+            try:
+                tmp_dl = fetch_cover_url(src)
+                src = tmp_dl
+            except Exception as e:
+                return self._err(400, tr(f"could not fetch the picture: {e}",
+                                         f"не вышло скачать картинку: {e}"))
+        if not os.path.isfile(src):
+            return self._err(400, tr("no such file", "нет такого файла"))
+        try:
+            names = set_cover(folder, src)
+        except Exception as e:
+            return self._err(400, tr(f"could not read a picture out of it: {e}",
+                                     f"не вышло достать картинку: {e}"))
+        finally:
+            if tmp_dl:
+                try:
+                    os.remove(tmp_dl)
+                except OSError:
+                    pass
+        data = P.load(folder)
+        data["cover"] = "cover.jpg"
+        data["coverBg"] = True
+        # a clip gives several frames: the video plays them as a slow
+        # slideshow; a single picture stays a single picture
+        data["coverSet"] = names if len(names) > 1 else None
+        P.save(folder, data)
+        return self._json({"ok": True, "cover": True,
+                           "frames": len(names)})
+
+    @route("POST", r"^/api/project/([^/]+)/backdrop$")
+    def post_backdrop(self, m, q, body):
+        folder = project_dir(m.group(1))
+        data = P.load(folder)
+        if body.get("off"):
+            for old in os.listdir(folder):
+                if old.startswith("backdrop."):
+                    try:
+                        os.remove(os.path.join(folder, old))
+                    except OSError:
+                        pass
+            data["backdrop"] = None
+            P.save(folder, data)
+            return self._json({"ok": True, "backdrop": False})
+        src = (body.get("path") or body.get("url") or "").strip()
+        got = None
+        if re.match(r"^https?://", src):
+            # The link the song itself came from will do: the backdrop
+            # is asked for at the smallest size the site offers, since
+            # it is blurred past recognising anyway.
+            try:
+                got = FE.clip(src, folder)
+                src = got
+            except Exception as e:
+                return self._err(400, tr(f"could not fetch the clip: {e}",
+                                         f"не вышло скачать клип: {e}"))
+        if not os.path.isfile(src):
+            return self._err(400, tr("no such file", "нет такого файла"))
+        try:
+            name = set_backdrop(folder, src)
+        except Exception as e:
+            return self._err(400, tr(f"not a clip: {e}",
+                                     f"это не клип: {e}"))
+        finally:
+            if got and os.path.isfile(got):
+                try:
+                    os.remove(got)
+                except OSError:
+                    pass
+        data = P.load(folder)
+        data["backdrop"] = name
+        P.save(folder, data)
+        return self._json({"ok": True, "backdrop": True})
+
+    @route("POST", r"^/api/project/([^/]+)/pack$")
+    def post_pack(self, m, q, body):
+        folder = project_dir(m.group(1))
+        data = P.load(folder)
+        # Next to the audio it came from, where a person will find it.
+        out_dir = os.path.dirname(data.get("source_audio") or "") or PROJECTS
+        if not os.path.isdir(out_dir):
+            out_dir = PROJECTS
+        try:
+            return self._json({"path": P.pack(folder, out_dir)})
+        except (OSError, ValueError) as e:
+            return self._err(400, str(e))
+
+    @route("POST", r"^/api/unpack$")
+    def post_unpack(self, m, q, body):
+        src = (body.get("path") or "").strip()
+        if not os.path.isfile(src):
+            return self._err(400, tr("no such file", "нет такого файла"))
+        try:
+            folder = P.unpack(src, PROJECTS)
+        except Exception as e:
+            # a corrupt zip raises its own kind — the answer is the
+            # same calm sentence, not a stack trace
+            return self._err(400, str(e))
+        return self._json({"id": os.path.basename(folder)})
+
+    @route("POST", r"^/api/project/([^/]+)/delete$")
+    def post_delete(self, m, q, body):
+        P.delete(project_dir(m.group(1)))
+        return self._json({"ok": True})
+
+    @route("POST", r"^/api/project/([^/]+)/track$")
+    def post_track(self, m, q, body):
+        folder = project_dir(m.group(1))
+        src = body.get("path", "")
+        kind = body.get("track", "instrumental")
+        shift = bool(body.get("shift", True))
+        jid = start_job(tr("Swapping the track", "Меняю дорожку"),
+                        lambda log: replace_track(folder, src, kind, shift, log))
+        return self._json({"job": jid})
+
+    @route("POST", r"^/api/project/([^/]+)/realign-part$")
+    def post_realign_part(self, m, q, body):
+        folder = project_dir(m.group(1))
+        jid = start_job(tr("Timing a few lines again",
+                           "Размечаю несколько строк заново"),
+                        lambda log: realign_part(folder, body, log))
+        return self._json({"job": jid})
+
+    @route("POST", r"^/api/project/([^/]+)/realign$")
+    def post_realign(self, m, q, body):
+        folder = project_dir(m.group(1))
+        jid = start_job(tr("Recomputing the timing", "Пересчитываю разметку"),
+                        lambda log: realign(folder, body, log))
+        return self._json({"job": jid})
+
+    @route("POST", r"^/api/project/([^/]+)/export$")
+    def post_export(self, m, q, body):
+        folder = project_dir(m.group(1))
+        kind = body.get("kind", "html")
+        jid = start_job(tr("Export ", "Экспорт ") + kind,
+                        lambda log: export(folder, kind, body, log))
+        return self._json({"job": jid})
 
     def _upload(self, q):
         """A file dropped into the window. The browser gives no path, only the
@@ -498,307 +813,6 @@ class Handler(BaseHTTPRequestHandler):
             os.remove(dst)
             return self._err(400, tr("the file did not arrive in full", "файл дошёл не полностью"))
         return self._json({"path": dst, "name": os.path.basename(dst)})
-
-    def do_POST(self):
-        self._pick_lang()
-        u = urlparse(self.path)
-        if not self._local():
-            return self._err(403, tr("this computer only", "только с этого компьютера"))
-        path = dec_path(u.path)
-        q = parse_qs(u.query)
-        try:
-            if path == "/api/upload":
-                return self._upload(q)
-            body = self._body()
-
-            if path == "/api/reveal":
-                # Show the finished file in the file manager. Otherwise it has
-                # to be hunted for — it sits next to the original song.
-                target = body.get("path", "")
-                if not os.path.exists(target):
-                    return self._err(404, tr("the file is gone: ", "файла уже нет: ") + target)
-                try:
-                    reveal(target)
-                    return self._json({"ok": True})
-                except Exception as e:
-                    return self._err(500, tr(f"could not open the folder: {e}", f"не вышло открыть папку: {e}"))
-
-            if path == "/api/report":
-                # The report before building: the song, the text, what to expect.
-                audio, lyrics = body.get("audio", ""), body.get("lyrics", "")
-                for f in (audio, lyrics):
-                    if not os.path.isfile(f):
-                        return self._err(400, tr(f"file not found: {f}", f"файл не найден: {f}"))
-                try:
-                    return self._json(make_report(audio, lyrics, body))
-                except Exception as e:
-                    return self._err(400, tr(f"could not make sense of the files: {e}", f"не вышло разобрать файлы: {e}"))
-
-            if path == "/api/fetch":
-                # The sound from a link. It is a long job with a log of its
-                # own: a download can take a minute and can fail halfway.
-                url = (body.get("url") or "").strip()
-                try:
-                    FE.check_url(url)
-                except FE.FetchError as e:
-                    return self._err(400, str(e))
-                if not FE.available():
-                    return self._err(400, FE.how_to_install())
-                jid = start_job(tr("Taking the sound from the link",
-                                   "Достаю звук по ссылке"),
-                                lambda log: FE.download(url, incoming_dir(), log))
-                return self._json({"job": jid})
-
-            if path == "/api/lyrics/find":
-                # A suggestion, not an answer: the words are shown to be read
-                # before they are used.
-                try:
-                    found = FL.search(body.get("track", ""), body.get("artist", ""),
-                                      float(body.get("duration") or 0))
-                except FL.LyricsError as e:
-                    return self._err(400, str(e))
-                except Exception as e:
-                    return self._err(400, str(e))
-                return self._json({"source": FL.SOURCE, "found": found})
-
-            if path == "/api/lyrics/save":
-                # Lyrics pasted into the window. Everything downstream works
-                # with a file on disk, so this makes one.
-                text = (body.get("text") or "").strip()
-                if not text:
-                    return self._err(400, tr("the lyrics are empty", "текст пустой"))
-                if len(text) > 400_000:
-                    return self._err(413, tr("that is too much text for a song",
-                                             "для песни это слишком много текста"))
-                stem = re.sub(r'[<>:"|?*\\/\x00-\x1f]', "_",
-                              (body.get("name") or "").strip())[:60].strip() or "lyrics"
-                dst = os.path.join(incoming_dir(), stem + ".txt")
-                base, n = dst[:-4], 2
-                while os.path.exists(dst):
-                    dst = f"{base}-{n}.txt"
-                    n += 1
-                with open(dst, "w", encoding="utf-8") as f:
-                    f.write(text.replace("\r\n", "\n").rstrip() + "\n")
-                return self._json({"path": dst, "name": os.path.basename(dst)})
-
-            if path == "/api/new":
-                audio, lyrics = body.get("audio", ""), body.get("lyrics", "")
-                for f in (audio, lyrics):
-                    if not os.path.isfile(f):
-                        return self._err(400, tr(f"file not found: {f}", f"файл не найден: {f}"))
-                opts = dict(align_engine=body.get("align", "auto"),
-                            whisper_model=body.get("model", "small"),
-                            language=body.get("lang", "auto"),
-                            separate=bool(body.get("separate", True)),
-                            skip=body.get("noText") or "",
-                            # four passes instead of one: a cleaner voice, and
-                            # the timing is made from the voice
-                            separator=("htdemucs_ft"
-                                       if body.get("separator") == "htdemucs_ft"
-                                       else "htdemucs"),
-                            # a song taken from a link knows its own name;
-                            # the file it landed in is called something safe
-                            title=body.get("title") or "",
-                            artist=body.get("artist") or "",
-                            # typed into the field, not taken from a file name
-                            title_set=bool(body.get("titleSet")),
-                            # the clip's cover as the backdrop, if asked for
-                            cover=body.get("cover") or None,
-                            cover_bg=bool(body.get("coverBg")))
-                jid = start_job(tr("Building the song", "Собираю песню"), lambda log: os.path.basename(
-                    P.create(audio, lyrics, PROJECTS, log=log, **opts)))
-                return self._json({"job": jid})
-
-            m = re.match(r"^/api/project/([^/]+)/timings$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                lines = body.get("lines")
-                if not isinstance(lines, list):
-                    return self._err(400, tr("no lines", "нет строк"))
-                data = P.save_lines(folder, lines, colors=body.get("colors"),
-                                    theme=body.get("theme"),
-                                    no_text=body.get("noText"),
-                                    keep_marks=body.get("keepMarks"),
-                                    check_off=body.get("checkOff"),
-                                    title=body.get("title"),
-                                    artist=body.get("artist"),
-                                    cover_dark=body.get("coverDark"),
-                                    grid=body.get("grid"),
-                                    dots_long=body.get("dotsLong"),
-                                    melody=body.get("melody"),
-                                    holds=body.get("holds"),
-                                    trim=body.get("trim"))
-                return self._json({"ok": True, "problems": P.problems(data)})
-
-            m = re.match(r"^/api/project/([^/]+)/cover$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                data = P.load(folder)
-                if body.get("remove"):
-                    # back to the woven gradient — the cover files go too
-                    for name in ["cover.jpg"] + [n for n in os.listdir(folder)
-                                                 if n.startswith("cover-")
-                                                 and n.endswith(".jpg")]:
-                        try:
-                            os.remove(os.path.join(folder, name))
-                        except OSError:
-                            pass
-                    data["cover"] = None
-                    data["coverBg"] = False
-                    data["coverSet"] = None
-                    P.save(folder, data)
-                    return self._json({"ok": True, "cover": False})
-                src = (body.get("path") or body.get("url") or "").strip()
-                tmp_dl = None
-                if re.match(r"^https?://", src):
-                    # a link to a picture: fetched here, sized within reason,
-                    # and treated like any file from then on
-                    try:
-                        tmp_dl = fetch_cover_url(src)
-                        src = tmp_dl
-                    except Exception as e:
-                        return self._err(400, tr(f"could not fetch the picture: {e}",
-                                                 f"не вышло скачать картинку: {e}"))
-                if not os.path.isfile(src):
-                    return self._err(400, tr("no such file", "нет такого файла"))
-                try:
-                    names = set_cover(folder, src)
-                except Exception as e:
-                    return self._err(400, tr(f"could not read a picture out of it: {e}",
-                                             f"не вышло достать картинку: {e}"))
-                finally:
-                    if tmp_dl:
-                        try:
-                            os.remove(tmp_dl)
-                        except OSError:
-                            pass
-                data = P.load(folder)
-                data["cover"] = "cover.jpg"
-                data["coverBg"] = True
-                # a clip gives several frames: the video plays them as a slow
-                # slideshow; a single picture stays a single picture
-                data["coverSet"] = names if len(names) > 1 else None
-                P.save(folder, data)
-                return self._json({"ok": True, "cover": True,
-                                   "frames": len(names)})
-
-            m = re.match(r"^/api/project/([^/]+)/backdrop$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                data = P.load(folder)
-                if body.get("off"):
-                    for old in os.listdir(folder):
-                        if old.startswith("backdrop."):
-                            try:
-                                os.remove(os.path.join(folder, old))
-                            except OSError:
-                                pass
-                    data["backdrop"] = None
-                    P.save(folder, data)
-                    return self._json({"ok": True, "backdrop": False})
-                src = (body.get("path") or body.get("url") or "").strip()
-                got = None
-                if re.match(r"^https?://", src):
-                    # The link the song itself came from will do: the backdrop
-                    # is asked for at the smallest size the site offers, since
-                    # it is blurred past recognising anyway.
-                    try:
-                        got = FE.clip(src, folder)
-                        src = got
-                    except Exception as e:
-                        return self._err(400, tr(f"could not fetch the clip: {e}",
-                                                 f"не вышло скачать клип: {e}"))
-                if not os.path.isfile(src):
-                    return self._err(400, tr("no such file", "нет такого файла"))
-                try:
-                    name = set_backdrop(folder, src)
-                except Exception as e:
-                    return self._err(400, tr(f"not a clip: {e}",
-                                             f"это не клип: {e}"))
-                finally:
-                    if got and os.path.isfile(got):
-                        try:
-                            os.remove(got)
-                        except OSError:
-                            pass
-                data = P.load(folder)
-                data["backdrop"] = name
-                P.save(folder, data)
-                return self._json({"ok": True, "backdrop": True})
-
-            m = re.match(r"^/api/project/([^/]+)/pack$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                data = P.load(folder)
-                # Next to the audio it came from, where a person will find it.
-                out_dir = os.path.dirname(data.get("source_audio") or "") or PROJECTS
-                if not os.path.isdir(out_dir):
-                    out_dir = PROJECTS
-                try:
-                    return self._json({"path": P.pack(folder, out_dir)})
-                except (OSError, ValueError) as e:
-                    return self._err(400, str(e))
-
-            if path == "/api/unpack":
-                src = (body.get("path") or "").strip()
-                if not os.path.isfile(src):
-                    return self._err(400, tr("no such file", "нет такого файла"))
-                try:
-                    folder = P.unpack(src, PROJECTS)
-                except Exception as e:
-                    # a corrupt zip raises its own kind — the answer is the
-                    # same calm sentence, not a stack trace
-                    return self._err(400, str(e))
-                return self._json({"id": os.path.basename(folder)})
-
-            m = re.match(r"^/api/project/([^/]+)/delete$", path)
-            if m:
-                P.delete(project_dir(m.group(1)))
-                return self._json({"ok": True})
-
-            m = re.match(r"^/api/project/([^/]+)/track$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                src = body.get("path", "")
-                kind = body.get("track", "instrumental")
-                shift = bool(body.get("shift", True))
-                jid = start_job(tr("Swapping the track", "Меняю дорожку"),
-                                lambda log: replace_track(folder, src, kind, shift, log))
-                return self._json({"job": jid})
-
-            m = re.match(r"^/api/project/([^/]+)/realign-part$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                jid = start_job(tr("Timing a few lines again",
-                                   "Размечаю несколько строк заново"),
-                                lambda log: realign_part(folder, body, log))
-                return self._json({"job": jid})
-
-            m = re.match(r"^/api/project/([^/]+)/realign$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                jid = start_job(tr("Recomputing the timing", "Пересчитываю разметку"),
-                                lambda log: realign(folder, body, log))
-                return self._json({"job": jid})
-
-            m = re.match(r"^/api/project/([^/]+)/export$", path)
-            if m:
-                folder = project_dir(m.group(1))
-                kind = body.get("kind", "html")
-                jid = start_job(tr("Export ", "Экспорт ") + kind,
-                                lambda log: export(folder, kind, body, log))
-                return self._json({"job": jid})
-
-            return self._err(404, tr("not found", "не найдено"))
-        except FileNotFoundError as e:
-            # Not every missing file means a missing project: any such error
-            # used to say “song not found”, leaving nowhere to look.
-            self._err(404, tr("song not found", "проект не найден")
-                      if "проект" in str(e).lower() or not str(e)
-                      else tr(f"not found: {e}", f"не найдено: {e}"))
-        except Exception as e:
-            traceback.print_exc()
-            self._err(500, str(e))
 
 
 # --------------------------------------------------------------------------- #
