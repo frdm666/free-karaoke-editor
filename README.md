@@ -574,6 +574,14 @@ line is wholly in round brackets):
 * on the finished page such a line is highlighted in the **second colour**;
 * lines that sound at the same time are highlighted **together**.
 
+In the video a line and the backing under it are one couplet, and they are
+shown as one: the backing takes its seat, small and to the right, as soon as
+its lead does — before it has sounded — and the lead stays above it while it
+answers. The pair waits together in the queue below as well, in the room the
+line after would have taken. A backing that has not finished is not swallowed
+by the line that starts over it: the new lead takes the main seat, the old
+backing keeps its own.
+
 **`♪ Original`** marks a line you are not meant to sing — backing vocals,
 speech, a bit that matters to the story. The original voice comes back exactly
 there, whatever the Voice slider says, and fades out again at the end of the

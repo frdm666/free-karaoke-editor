@@ -220,6 +220,30 @@ def next_sung(lines, i: int) -> int:
     return j
 
 
+def backing_of(lines, i: int) -> int:
+    """The backing line that belongs to lead `i`, or -1.
+
+    A na-na-na written under a line answers that line: on the page the two
+    stand together, one couplet. The frame used to bring the backing on only
+    while it actually sounded and to drop the lead the moment it ended, so a
+    pair the singer reads as one thing arrived in pieces.
+    """
+    if not 0 <= i < len(lines) or lines[i].get("backing"):
+        return -1
+    j = i + 1
+    return j if j < len(lines) and lines[j].get("backing") else -1
+
+
+def lead_of(lines, i: int) -> int:
+    """The lead a backing line answers, or -1 — it may answer from further up."""
+    if i <= 0 or not lines[i].get("backing"):
+        return -1
+    j = i - 1
+    while j >= 0 and lines[j].get("backing"):
+        j -= 1
+    return j if j >= 0 else -1
+
+
 def intro_lead(args, name: str) -> float:
     """Seconds that run before the music: the card, and then the count.
 
@@ -969,7 +993,18 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
         singer reads forward, never back. The count-in shows the same queue,
         so nothing jumps when the music finally starts."""
         nx = get(n1, False)
-        paste_faded(frame, nx.dim, (0, y_next - nx.h // 2 + off), alpha)
+        y1 = y_next - nx.h // 2 + off
+        paste_faded(frame, nx.dim, (0, y1), alpha)
+        # The backing that belongs to the line coming next waits with it: the
+        # two are one couplet, so they are read together before they are sung,
+        # not one at a time. It takes the room the line after would have had —
+        # two rows of queue with a right-hand reply among them is a cue; three
+        # is a crowd.
+        qb = backing_of(lines, n1)
+        if qb >= 0 and qb != duo:
+            bp = get(qb, main=False, duo_side=True)
+            paste_faded(frame, bp.faint, (0, y1 + nx.h + int(H * 0.002)), alpha)
+            return
         n2i = next_sung(lines, n1)
         if n2i < len(lines) and n2i != duo:
             n2 = get(n2i, False)
@@ -1250,6 +1285,15 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                         and (lines[j].get("voice") == 2) != (lines[idx].get("voice") == 2):
                     duo = j
                     break
+
+        # A lead and its backing keep their seats together whether or not both
+        # are sounding: the backing sits down as soon as its lead does, and the
+        # lead stays in the main seat while the backing answers it. Before,
+        # each came on alone at the moment it sounded — the pair on the page
+        # arrived in the frame as two separate events.
+        if duo < 0 and idx >= 0:
+            duo = (lead_of(lines, idx) if lines[idx].get("backing")
+                   else backing_of(lines, idx))
 
         # The song has been sung: after a few seconds the seat empties. A
         # last line hanging lit to the end of the recording reads as a

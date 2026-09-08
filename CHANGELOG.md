@@ -7,6 +7,32 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.55.0
+
+**A line and the backing under it now arrive together in the video, and leave
+together.** On the page the two have always stood as one couplet: the singer
+reads the line and the na-na-na beneath it in one glance, before either is
+sung. The frame did it differently — each came on alone, at the moment it
+sounded, and went out as soon as it stopped, so a pair that is one thought
+arrived in pieces.
+
+The backing takes its seat, small and to the right, as soon as its lead does,
+whether or not it has sounded yet; the lead stays in the main seat while the
+backing answers it. In the queue below the pair waits as a pair too, in the
+room the line after would have taken — two rows of queue with a right-hand
+reply among them is a cue, three is a crowd.
+
+A backing that has not finished is not swallowed by the line that starts over
+it: the new lead takes the main seat and the old backing keeps its own. That
+already held, and it is now held down by a test, because the seating above
+could have taken it away without a sound.
+
+The guide dots are untouched: on a long wait, when they are asked for, they
+still count the line in — and the pair, which reaches further down the frame,
+pushes them down instead of standing on them.
+
+---
+
 ## 4.54.0
 
 **A setting added to the program now reaches the settings file you already

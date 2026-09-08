@@ -210,8 +210,9 @@ def main():
           f"left {back_left}, right {back_right}, lead {lead_ink}")
 
     # …and when the lead ends but the na-na-na carries on, the backing keeps
-    # its side seat instead of being promoted to the main one, full size, in
-    # the way of the lead text.
+    # its side seat — never promoted to the main one, full size, in the way of
+    # the lead text — and the lead it answers stays above it: on the page the
+    # two are one couplet, and half a couplet is not what the singer reads.
     png_alone = os.path.join(tmp, "duet-alone.png")
     subprocess.run([AU.ffmpeg(), "-y", "-v", "error", "-ss", "3.9", "-i", AD.output,
                     "-frames:v", "1", png_alone], check=True)
@@ -226,13 +227,103 @@ def main():
     main_seat = ink_a(0.36, 0.48)
     side_left = ink_a(0.46, 0.58, 0.0, 0.5)
     side_right = ink_a(0.46, 0.58, 0.5, 1.0)
-    check("with the lead gone, the main seat stays empty",
-          main_seat < 40, main_seat)
-    check("the lone backing still sits small to the right",
+    check("the lead it answers keeps the main seat",
+          main_seat > 150, main_seat)
+    check("and the backing still sits small to the right",
           side_right > 30 and side_right > side_left * 1.5,
           f"left {side_left}, right {side_right}")
     check("and the next lead still waits below",
           ink_a(0.58, 0.70) > 40, ink_a(0.58, 0.70))
+
+    print("\nA lead and its backing arrive together and leave together")
+    # On the page a line and the na-na-na under it stand as one couplet: both
+    # can be read before either is sung, and neither disappears while the
+    # other still sounds. The frame used to bring each on alone, at the very
+    # moment it sounded, and drop it as soon as it stopped.
+    pair_song = {"colors": ["#00ff00", "#ff00ff"],
+                 "theme": {"bg": "#000000", "text": "#ffffff"},
+                 "dotsLong": True,
+                 "data": {"title": "T", "duration": 26.0, "lines": [
+                     {"text": "first lead line", "start": 2.0, "end": 4.0, "voice": 1,
+                      "words": [{"w": "first", "t": 2.0, "d": 0.7, "s": 1},
+                                {"w": "lead", "t": 2.7, "d": 0.7, "s": 1},
+                                {"w": "line", "t": 3.4, "d": 0.6, "s": 1}]},
+                     {"text": "(uh-huh)", "start": 5.0, "end": 9.0, "voice": 2,
+                      "backing": True,
+                      "words": [{"w": "(uh-huh)", "t": 5.0, "d": 4.0, "s": 2}]},
+                     {"text": "second lead line", "start": 7.0, "end": 9.5, "voice": 1,
+                      "words": [{"w": "second", "t": 7.0, "d": 0.8, "s": 2},
+                                {"w": "lead", "t": 7.8, "d": 0.8, "s": 1},
+                                {"w": "line", "t": 8.6, "d": 0.9, "s": 1}]},
+                     {"text": "third lead line", "start": 22.0, "end": 24.0, "voice": 1,
+                      "words": [{"w": "third", "t": 22.0, "d": 0.7, "s": 1},
+                                {"w": "lead", "t": 22.7, "d": 0.7, "s": 1},
+                                {"w": "line", "t": 23.4, "d": 0.6, "s": 1}]}]}}
+    wavp = tone(os.path.join(tmp, "p.wav"), 220.0, 26.0)
+
+    class AP:
+        width, height, fps, crf = 640, 360, 5, 30
+        preset, font = "ultrafast", None
+        intro = False
+        start, seconds, audio, timings = 0.0, 16.0, "minus", None
+        output = os.path.join(tmp, "pair.mp4")
+    video.render(pair_song, wavp, AP.output, AP())
+
+    def shot(at):
+        """One frame of that film, as a way of counting ink in a band."""
+        png = os.path.join(tmp, f"pair-{at}.png")
+        subprocess.run([AU.ffmpeg(), "-y", "-v", "error", "-ss", str(at),
+                        "-i", AP.output, "-frames:v", "1", png], check=True)
+        im = Image.open(png).convert("RGB")
+        w, h = im.size
+
+        def ink(y0, y1, x0=0.0, x1=1.0):
+            return sum(1 for y in range(int(h * y0), int(h * y1))
+                       for x in range(int(w * x0), int(w * x1), 2)
+                       if sum(im.getpixel((x, y))) > 90)
+        return ink
+
+    # Before a note is sung: the line that opens the song is in the queue, and
+    # its backing waits with it, in the place the line after would have taken.
+    early = shot(0.4)
+    q_left, q_right = early(0.62, 0.72, 0.0, 0.5), early(0.62, 0.72, 0.5, 1.0)
+    check("the backing waits in the queue with its lead",
+          q_right > 20 and q_right > q_left * 1.5, f"left {q_left}, right {q_right}")
+
+    # The lead is being sung and its backing has not started: it is on screen
+    # all the same, so the pair is read whole before the answer comes.
+    ahead = shot(3.0)
+    check("a backing yet to sound already sits under its lead",
+          ahead(0.50, 0.60, 0.5, 1.0) > 20, ahead(0.50, 0.60, 0.5, 1.0))
+    check("and the lead is where a solo line sits",
+          ahead(0.38, 0.50) > 150, ahead(0.38, 0.50))
+
+    # The lead has finished, the backing answers: the lead stays above it.
+    answer = shot(6.0)
+    check("the lead stays while its backing answers",
+          answer(0.38, 0.50) > 150, answer(0.38, 0.50))
+    check("with the backing still in its own seat",
+          answer(0.50, 0.60, 0.5, 1.0) > 20, answer(0.50, 0.60, 0.5, 1.0))
+
+    # A backing that has not finished is not swallowed by the line that starts
+    # over it: the new lead takes the main seat, the old backing keeps its own.
+    both = shot(8.0)
+    check("a new line does not eat a backing still sounding",
+          both(0.50, 0.60, 0.5, 1.0) > 20, both(0.50, 0.60, 0.5, 1.0))
+    check("and the new lead has the main seat", both(0.38, 0.50) > 150,
+          both(0.38, 0.50))
+
+    # And none of the seating disturbs the dots: on a long wait, when they are
+    # asked for, they still count the line in.
+    waiting = shot(15.0)
+    check("the dots still count down a long pause",
+          waiting(0.50, 0.55, 0.35, 0.65) > 20,
+          waiting(0.50, 0.55, 0.35, 0.65))
+    # …and that band is empty while the singing goes on, so the count above
+    # is the dots and not the tail of a letter.
+    check("and there is nothing there while the singing goes on",
+          ahead(0.50, 0.55, 0.35, 0.65) < 10,
+          ahead(0.50, 0.55, 0.35, 0.65))
 
     print("\nThe frame reads forward, not back")
     # The sung line is gone from the frame; the current line has the next one
