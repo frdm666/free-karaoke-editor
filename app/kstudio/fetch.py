@@ -94,31 +94,91 @@ def extra_args() -> list:
     A locked-down video needs cookies, and that is not something the program
     can decide for anyone: the way in is `yt-dlp-args` in settings.ini, or
     KARAOKE_YTDLP_ARGS in the environment. For example:
-        yt-dlp-args = --cookies-from-browser chrome
+        yt-dlp-args = --cookies-from-browser firefox
     """
-    raw = (os.environ.get("KARAOKE_YTDLP_ARGS") or "").strip()
-    if not raw:
-        app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        for ini in (os.path.join(app, "settings.ini"),
-                    os.path.join(os.path.dirname(app), "settings.ini")):
-            try:
-                with open(ini, encoding="utf-8-sig") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("#") or "=" not in line:
-                            continue
-                        key, _, val = line.partition("=")
-                        if key.strip().lower() in ("yt-dlp-args", "ключи-загрузчика"):
-                            raw = val.strip()
-                            break
-            except OSError:
-                continue
-            if raw:
-                break
+    raw = ((os.environ.get("KARAOKE_YTDLP_ARGS") or "").strip()
+           or _setting("yt-dlp-args", "ключи-загрузчика"))
     try:
         return shlex.split(raw)
     except ValueError:
         return []
+
+
+def _browser_homes() -> dict:
+    """Where each browser keeps the profile yt-dlp would read.
+
+    Firefox stands first on purpose: its cookies lie in a file of its own,
+    while the rest are locked to the system keyring and ask for it out loud —
+    and Safari wants full disk access on top of that, so it stands last.
+    """
+    if sys.platform == "darwin":
+        sup = "~/Library/Application Support/"
+        return {"firefox": [sup + "Firefox"],
+                "chrome": [sup + "Google/Chrome"],
+                "brave": [sup + "BraveSoftware/Brave-Browser"],
+                "edge": [sup + "Microsoft Edge"],
+                "chromium": [sup + "Chromium"],
+                "vivaldi": [sup + "Vivaldi"],
+                "opera": [sup + "com.operasoftware.Opera"],
+                "safari": ["~/Library/Safari"]}
+    if os.name == "nt":
+        app = os.environ.get("APPDATA") or ""
+        loc = os.environ.get("LOCALAPPDATA") or ""
+        return {"firefox": [os.path.join(app, "Mozilla", "Firefox")],
+                "chrome": [os.path.join(loc, "Google", "Chrome", "User Data")],
+                "brave": [os.path.join(loc, "BraveSoftware", "Brave-Browser",
+                                      "User Data")],
+                "edge": [os.path.join(loc, "Microsoft", "Edge", "User Data")],
+                "chromium": [os.path.join(loc, "Chromium", "User Data")],
+                "vivaldi": [os.path.join(loc, "Vivaldi", "User Data")],
+                "opera": [os.path.join(app, "Opera Software")]}
+    return {"firefox": ["~/.mozilla/firefox",
+                        "~/snap/firefox/common/.mozilla/firefox"],
+            "chrome": ["~/.config/google-chrome"],
+            "brave": ["~/.config/BraveSoftware/Brave-Browser"],
+            "edge": ["~/.config/microsoft-edge"],
+            "chromium": ["~/.config/chromium"],
+            "vivaldi": ["~/.config/vivaldi"],
+            "opera": ["~/.config/opera"]}
+
+
+def browsers() -> list:
+    """The browsers on this machine yt-dlp could take cookies from."""
+    return [name for name, homes in _browser_homes().items()
+            if any(h and os.path.isdir(os.path.expanduser(h)) for h in homes)]
+
+
+def cookie_advice() -> str:
+    """What to write, in this person's settings.ini, on this machine.
+
+    “A video that asks you to sign in needs cookies” is true and useless: it
+    was the whole answer to a locked video, and it pointed at a line that a
+    settings.ini made before that setting did not contain. So the advice
+    spells the line out, and names a browser that is actually installed here.
+    """
+    if any(a.startswith("--cookies") for a in extra_args()):
+        return tr("Cookies are already set in settings.ini, so they have "
+                  "probably gone stale: sign in to the site again in that "
+                  "browser.",
+                  "Куки в settings.ini уже прописаны — значит, скорее всего "
+                  "протухли: войдите на сайт в том браузере ещё раз.")
+    found = browsers()
+    if not found:
+        return tr("A video that asks you to sign in needs cookies from a "
+                  "browser you are signed in with — see yt-dlp-args in "
+                  "settings.ini.",
+                  "Видео, которое просит войти, требует куки из браузера, в "
+                  "котором вы залогинены, — см. yt-dlp-args в settings.ini.")
+    line = f"yt-dlp-args = --cookies-from-browser {found[0]}"
+    rest = ((tr(f" ({', '.join(found[1:])} would do as well)",
+                f" ({', '.join(found[1:])} тоже подойдут)"))
+            if len(found) > 1 else "")
+    return tr(f"A video that asks you to sign in needs cookies: put "
+              f"“{line}” into settings.ini{rest} — being signed in to the "
+              f"site in that browser.",
+              f"Видео, которое просит войти, требует куки: впишите в "
+              f"settings.ini «{line}»{rest} — и будьте в том браузере "
+              f"залогинены.")
 
 
 def places() -> list:
@@ -479,12 +539,9 @@ def download(url: str, dest_dir: str, log: Optional[Callable] = None) -> dict:
             if again:
                 raise FetchError(reason + tr(
                     f" — and every player was turned away. The downloader is "
-                    f"probably older than the site: {STALE[0]}. A video that "
-                    f"asks you to sign in needs cookies — see yt-dlp-args in "
-                    f"settings.ini.",
+                    f"probably older than the site: {STALE[0]}. ",
                     f" — и отказано каждому клиенту. Скорее всего загрузчик "
-                    f"старше сайта: {STALE[0]}. Видео, которое просит войти, "
-                    f"требует куки — см. yt-dlp-args в settings.ini."))
+                    f"старше сайта: {STALE[0]}. ") + cookie_advice())
             raise FetchError(reason)
         info = _info(tmp)
         got = _pick(tmp)

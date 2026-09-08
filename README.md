@@ -219,7 +219,9 @@ nothing in it. The same link goes through as another client, so it is asked
 again (android, ios, tv) before you are told it did not work. If every one of
 them is turned away, two things are usually left: the downloader is older than
 the site — `pip install -U yt-dlp` — or the video wants you to be signed in,
-which means cookies:
+which means cookies. The message says so with the line already written out and
+a browser that is actually on your machine in it, so there is nothing to look
+up; if cookies are set there already, it says they have gone stale instead:
 
 ```ini
 yt-dlp-args = --cookies-from-browser firefox

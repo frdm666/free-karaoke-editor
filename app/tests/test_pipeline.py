@@ -2681,6 +2681,46 @@ def main():
     check("and it really lands in the command line",
           "--cookies-from-browser chrome" in open(attempts, encoding="utf-8").read())
     del os.environ["KARAOKE_YTDLP_ARGS"], os.environ["KARAOKE_STUB_LOG"]
+
+    # A video that asks you to sign in used to end in “needs cookies — see
+    # yt-dlp-args in settings.ini”, and that line was missing from every
+    # settings.ini made before the setting existed. So the advice spells the
+    # line out, with a browser that is really on this machine in it.
+    homes = FE._browser_homes
+    fake = tempfile.mkdtemp(prefix="karaoke_browsers_")
+    os.makedirs(os.path.join(fake, "Firefox"), exist_ok=True)
+    FE._browser_homes = lambda: {"firefox": [os.path.join(fake, "Firefox")],
+                                 "chrome": [os.path.join(fake, "Chrome")]}
+    try:
+        advice = FE.cookie_advice()
+        check("the advice spells the whole line out",
+              "yt-dlp-args = --cookies-from-browser firefox" in advice, advice)
+        check("and names no browser that is not installed",
+              "chrome" not in advice, advice)
+        try:
+            FE.download("https://example.com/watch?v=locked", inbox)
+            check("a video that wants a sign-in is an error, not a file", False)
+        except FE.FetchError as e:
+            check("the refusal carries that same line",
+                  "--cookies-from-browser firefox" in str(e), str(e)[-100:])
+            check("and still says the downloader may be older than the site",
+                  "pip install -U yt-dlp" in str(e), str(e)[:100])
+        os.makedirs(os.path.join(fake, "Chrome"), exist_ok=True)
+        two = FE.cookie_advice()
+        check("a second browser stands behind the first, not in its place",
+              "chrome" in two and two.index("firefox") < two.index("chrome"), two)
+        # …and when cookies are written down already, the trouble is not that
+        # they are missing.
+        os.environ["KARAOKE_YTDLP_ARGS"] = "--cookies-from-browser firefox"
+        check("cookies already set are called stale, not missing",
+              "yt-dlp-args =" not in FE.cookie_advice(), FE.cookie_advice())
+        del os.environ["KARAOKE_YTDLP_ARGS"]
+        FE._browser_homes = lambda: {"firefox": [os.path.join(fake, "nowhere")]}
+        check("with no browser found at all it still names the setting",
+              "yt-dlp-args" in FE.cookie_advice(), FE.cookie_advice())
+    finally:
+        FE._browser_homes = homes
+        shutil_rm(fake)
     del os.environ["KARAOKE_YTDLP"]
 
     print("\nWhen the downloader is nowhere to be found, the words help")

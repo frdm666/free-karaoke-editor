@@ -9,7 +9,8 @@ KARAOKE_STUB_LOG    — a file to append one line per run to, so the checks can
 A link with “fail” in it does the same thing, so that both endings can be
 walked through against one running studio. A link with “reload” in it plays
 the refusal YouTube gives a client it does not like: it fails for everyone
-except the android player, exactly as the real site does.
+except the android player, exactly as the real site does. A link with
+“locked” in it is refused by every client, the way an age-gated video is.
 """
 
 import json
@@ -36,6 +37,15 @@ def main() -> int:
     if "reload" in url and "player_client=android" not in " ".join(args):
         print("[youtube] zzz123: Downloading webpage")
         print("ERROR: [youtube] zzz123: The page needs to be reloaded.",
+              file=sys.stderr)
+        return 1
+
+    if "locked" in url:
+        # The refusal an age-gated video gives — the same to every client, so
+        # all four are asked and the person is told what to do about it.
+        print("[youtube] zzz123: Downloading webpage")
+        print("ERROR: [youtube] zzz123: Sign in to confirm your age. "
+              "This video may be inappropriate for some users.",
               file=sys.stderr)
         return 1
 

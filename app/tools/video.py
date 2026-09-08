@@ -1302,33 +1302,24 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
         over = over_k >= 1.0
         scene_alpha = 1.0 - over_k
 
-        # Who will sit where this frame — decided before a single pixel is
-        # laid down, so a seat changing hands can hand its old occupant to
+        # Who holds the main seat this frame — decided before a single pixel
+        # is laid down, so a seat changing hands can hand its old occupant to
         # the ghosts in the SAME frame. Deciding it afterwards left exactly
-        # one blank frame at every line change: the flash.
+        # one blank frame at every line change: the flash. Nobody holds it
+        # while the stage is empty, or while a backing sings with no lead of
+        # its own to sit above it.
         if fading:
-            occ = {}
-            if not over and idx >= 0:
-                if lines[idx].get("backing") and duo < 0:
-                    occ["side"] = idx
-                else:
-                    pair0 = [idx] if duo < 0 else sorted(
-                        [idx, duo], key=lambda j: lines[j].get("voice") == 2)
-                    occ["main"] = pair0[0]
-                    if len(pair0) > 1:
-                        occ["side"] = pair0[1]
-                q1 = next_sung(lines, idx)
-                if q1 < len(lines) and q1 != duo:
-                    occ["next"] = q1
-                    q2 = next_sung(lines, q1)
-                    if q2 < len(lines) and q2 != duo:
-                        occ["next2"] = q2
+            seat = None
+            if not over and idx >= 0 \
+                    and not (lines[idx].get("backing") and duo < 0):
+                seat = idx if duo < 0 else min(
+                    (idx, duo), key=lambda j: lines[j].get("voice") == 2)
             # The column rides: when the main seat changes hands, everything
             # slides up one step over SLIDE seconds and the line leaving the
             # top goes with it, fading as it rises out of the frame.
-            if occ.get("main") != slide[0]:
+            if seat != slide[0]:
                 slide[1] = slide[0]
-                slide[0] = occ.get("main")
+                slide[0] = seat
                 slide[2] = t
             ride = (min(1.0, (t - slide[2]) / SLIDE)
                     if slide[0] is not None else 1.0)

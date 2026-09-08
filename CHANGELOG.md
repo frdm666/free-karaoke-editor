@@ -7,6 +7,27 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.56.0
+
+**A locked video is answered with the line to write, not with where to read
+about it.** “Needs cookies — see yt-dlp-args in settings.ini” was true, and it
+pointed at a line that a settings.ini made before that setting existed did not
+contain: the reader was sent to look for something that was not there. Now the
+refusal carries the whole line — `yt-dlp-args = --cookies-from-browser
+firefox` — with a browser that is really installed on this machine in it, and
+whatever else was found named behind it. Firefox comes first where it is
+there: its cookies lie in a file of its own, while the rest are locked to the
+system keyring and ask for it out loud. If cookies are set in the settings
+already, the answer is a different one — they are there, so they have gone
+stale, and signing in again is what fixes it.
+
+Two smaller things, both invisible: reading `yt-dlp-args` out of settings.ini
+went through a hand-written walk of the file standing beside the function that
+already does exactly that, and the frame's seating kept a note of three seats
+nobody ever read back. Both are gone.
+
+---
+
 ## 4.55.0
 
 **A line and the backing under it now arrive together in the video, and leave
