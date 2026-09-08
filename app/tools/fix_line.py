@@ -26,6 +26,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from kstudio import align as A  # noqa: E402
 from kstudio.i18n import tr  # noqa: E402
 
 
@@ -58,14 +59,8 @@ def tidy_line(line: dict, max_gap: float = 1.2) -> bool:
     if len(ws) < 2:
         return False
 
-    groups, cur = [], [ws[0]]
-    for prev, w in zip(ws, ws[1:]):
-        if w["t"] - (prev["t"] + prev["d"]) > max_gap:
-            groups.append(cur)
-            cur = [w]
-        else:
-            cur.append(w)
-    groups.append(cur)
+    groups = [[ws[i] for i in g]
+              for g in A.gap_groups([(w["t"], w["t"] + w["d"]) for w in ws], max_gap)]
     if len(groups) < 2:
         return False
 

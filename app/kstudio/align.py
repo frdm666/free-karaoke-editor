@@ -534,6 +534,16 @@ def align_whisper(lyrics: Lyrics, audio_path: str, duration: float,
     sung_end = min(last_sound(audio_path, duration), keep[-1][1] if keep else duration)
     text_end = max((ln.end for ln in lyrics.lines if ln.end is not None), default=0.0)
     untexted = max(0.0, sung_end - text_end)
+    _repairs(lyrics, duration, audio_path, skip, keep, isolated, untexted, log)
+    _final_notes(lyrics, text_end, sung_end, duration, log)
+    return lyrics
+
+
+def _repairs(lyrics: Lyrics, duration: float, audio_path: str, skip, keep,
+             isolated: bool, untexted: float, log: Log) -> None:
+    """The passes after the model has spoken: piles spread, silences
+    respected, the backing placed, the person's own marks enforced, the
+    order and the ragged ends mended, the bounds kept inside the track."""
     if pile_runs(lyrics.lines):
         repair_piles(lyrics, duration, log=log,
                      floor=max(first_sound(audio_path), keep[0][0] if keep else 0.0),
@@ -557,6 +567,12 @@ def align_whisper(lyrics: Lyrics, audio_path: str, duration: float,
     repair_ragged(lyrics, log=log)
     _fill_lines(lyrics, duration)      # after repairs the bounds may exceed the track
 
+
+def _final_notes(lyrics: Lyrics, text_end: float, sung_end: float,
+                 duration: float, log: Log) -> None:
+    """What must be said before the page is trusted: a stretch of singing
+    with no text under it, and lines that could not be timed at all."""
+    untexted = max(0.0, sung_end - text_end)
     # What could not be spread stays a pile, and a pile is not a timing: those
     # lines fly past in a blink. Better to name them than to hand over a page
     # that looks finished and is not.
@@ -590,7 +606,6 @@ def align_whisper(lyrics: Lyrics, audio_path: str, duration: float,
                f"{stuck[0]}–{stuck[-1]}). Whisper не расслышал там слов: тихое или "
                f"шёпотом спетое место. Растащите их в студии мышкой или нажмите "
                f"«Разметить заново» с движком по энергии."))
-    return lyrics
 
 
 def report_warnings(caught, lines: int, log: Log) -> int:
@@ -695,6 +710,25 @@ def _interpolate_gaps(words: List[Word]) -> None:
 
 # --------------------------------------------------------------------------- #
 
+def gap_groups(spans: list, max_gap: float) -> List[List[int]]:
+    """Indices of `spans` — (start, end) pairs in order — cut wherever the
+    silence between one and the next is longer than `max_gap`.
+
+    Inside one sung line there are no gaps of several seconds; where there is
+    one, a word flew away from its neighbours, and the groups say which words
+    stayed together. The page build and the by-hand repair tool both ask.
+    """
+    groups, cur = [], [0]
+    for i in range(1, len(spans)):
+        if spans[i][0] - spans[i - 1][1] > max_gap:
+            groups.append(cur)
+            cur = [i]
+        else:
+            cur.append(i)
+    groups.append(cur)
+    return groups
+
+
 def repair_lines(lyrics: Lyrics, max_word_gap: float = 1.2, log: Log = _noop) -> int:
     """Put back together the lines whose words drifted apart in time.
 
@@ -710,14 +744,8 @@ def repair_lines(lyrics: Lyrics, max_word_gap: float = 1.2, log: Log = _noop) ->
         if len(ws) < 2 or any(w.start is None or w.end is None for w in ws):
             continue
 
-        groups, cur = [], [ws[0]]
-        for prev, w in zip(ws, ws[1:]):
-            if (w.start or 0) - (prev.end or 0) > max_word_gap:
-                groups.append(cur)
-                cur = [w]
-            else:
-                cur.append(w)
-        groups.append(cur)
+        groups = [[ws[i] for i in g]
+                  for g in gap_groups([(w.start, w.end) for w in ws], max_word_gap)]
         if len(groups) < 2:
             continue
 

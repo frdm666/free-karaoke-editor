@@ -237,16 +237,8 @@ def top_up(ini: str, example: str) -> list:
     return added
 
 
-def main() -> int:
-    print("=" * 60)
-    print(tr("  Setting up Karaoke", "  Настройка программы «Караоке»"))
-    print("=" * 60)
-    print(f"\nPython: {sys.version.split()[0]}  ({sys.executable})")
-    if sys.version_info < (3, 8):
-        print(tr("Python 3.8 or newer is needed. Get it from python.org",
-                  "Нужен Python 3.8 или новее. Скачайте с python.org"))
-        return 1
-
+def step_ffmpeg() -> str:
+    """ffmpeg: nothing works without it. Says what is still open, or nothing."""
     print(tr("\n1. Checking ffmpeg (nothing works without it)…",
                   "\n1. Проверяю ffmpeg (без него никак)…"))
     from kstudio import audio as AU
@@ -279,7 +271,11 @@ def main() -> int:
                       f"   Поставьте сами: {ffmpeg_advice()}"))
             missing = tr(f"ffmpeg — nothing works without it: {ffmpeg_advice()}",
                          f"ffmpeg — без него ничего не работает: {ffmpeg_advice()}")
+    return missing
 
+
+def step_stable_ts() -> None:
+    """stable-ts, the Whisper neural net — word-by-word timing."""
     print(tr("\n2. Word-by-word timing (stable-ts, the Whisper neural net)",
                   "\n2. Точная разметка по словам (stable-ts, нейросеть Whisper)"))
     if installed("stable_whisper"):
@@ -294,6 +290,9 @@ def main() -> int:
         if ask(tr("   Install it?", "   Поставить?"), default_yes=False):
             pip_install("stable-ts")
 
+
+def step_demucs() -> None:
+    """demucs, and the soundfile it dies without — the instrumental."""
     print(tr("\n3. The instrumental — separating the vocal (demucs)",
                   "\n3. Минусовка — отделение вокала (demucs)"))
     if installed("demucs"):
@@ -313,6 +312,9 @@ def main() -> int:
             # soundfile is required: without it Demucs runs and then dies on write
             pip_install("demucs", "soundfile")
 
+
+def step_pillow() -> None:
+    """pillow — the MP4 render."""
     print(tr("\n4. Rendering an MP4 for YouTube (pillow)",
                   "\n4. Рендер ролика в MP4 для YouTube (pillow)"))
     if installed("PIL"):
@@ -323,6 +325,9 @@ def main() -> int:
         if ask(tr("   Install it?", "   Поставить?")):
             pip_install("pillow")
 
+
+def step_numpy() -> None:
+    """numpy — the faster loudness analysis."""
     print(tr("\n5. Faster loudness analysis (numpy)",
                   "\n5. Ускорение разбора громкости (numpy)"))
     if installed("numpy"):
@@ -332,6 +337,9 @@ def main() -> int:
                   "   Поставить numpy (небольшой, заметно ускоряет)?")):
             pip_install("numpy")
 
+
+def step_ytdlp() -> None:
+    """yt-dlp — a song from a link."""
     print(tr("\n6. A song from a link (yt-dlp)",
              "\n6. Песня по ссылке (yt-dlp)"))
     if installed("yt_dlp") or shutil.which("yt-dlp"):
@@ -346,6 +354,9 @@ def main() -> int:
         if ask(tr("   Install it?", "   Поставить?")):
             pip_install("yt-dlp")
 
+
+def step_settings() -> None:
+    """settings.ini: made from the example, or topped up with what is new."""
     print(tr("\n7. Your own settings file", "\n7. Свой файл настроек"))
     # settings.ini belongs to whoever runs the program: it is not in the
     # repository, so an update can never overwrite what they chose. The example
@@ -385,6 +396,25 @@ def main() -> int:
     else:
         print(tr("   No example next to the program — the defaults will be used.",
                  "   Примера рядом с программой нет — возьмутся значения по умолчанию."))
+
+
+def main() -> int:
+    print("=" * 60)
+    print(tr("  Setting up Karaoke", "  Настройка программы «Караоке»"))
+    print("=" * 60)
+    print(f"\nPython: {sys.version.split()[0]}  ({sys.executable})")
+    if sys.version_info < (3, 8):
+        print(tr("Python 3.8 or newer is needed. Get it from python.org",
+                  "Нужен Python 3.8 или новее. Скачайте с python.org"))
+        return 1
+
+    missing = step_ffmpeg()
+    step_stable_ts()
+    step_demucs()
+    step_pillow()
+    step_numpy()
+    step_ytdlp()
+    step_settings()
 
     print("\n" + "=" * 60)
     print(tr("Setup finished.", "Настройка закончена."))

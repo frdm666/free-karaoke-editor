@@ -484,6 +484,87 @@ def _extract_audio(payload: dict, html_path: str, tmp: str, mode: str) -> str:
 
 
 # ---------------------------------------------------------------- layout
+class Fonts:
+    """The typefaces of one film: one file, two seat sizes, and a memory.
+
+    A line is measured many times a second while the film is drawn, and the
+    same text against the same width always fits the same way — so a font once
+    found is kept. The width belongs in the key: the same text is measured both
+    against the frame and against nothing at all, to decide whether to wrap.
+    """
+
+    def __init__(self, path: str, H: int):
+        self.path = path
+        self.main = int(H * 0.072)
+        self.side = int(H * 0.042)
+        self.cache = {}
+
+    def fit(self, text, max_w, main):
+        """The seat's own size, stepped down until the text fits the width."""
+        from PIL import ImageFont
+        size = self.main if main else self.side
+        key = (text, size, max_w)
+        if key in self.cache:
+            return self.cache[key]
+        f = ImageFont.truetype(self.path, size)
+        # the floor scales with the seat: a side font can start BELOW a fixed
+        # floor, and then a long line simply ran off the edge, unshrunk
+        floor = max(10, min(18, size - 2))
+        while size > floor and f.getlength(text) > max_w:
+            size -= 2
+            f = ImageFont.truetype(self.path, size)
+        self.cache[key] = f
+        return f
+
+    def fitted(self, text, size, max_w):
+        """A font of the asked size, stepped down until the text fits."""
+        from PIL import ImageFont
+        f = ImageFont.truetype(self.path, size)
+        while size > 18 and f.getlength(text) > max_w:
+            size -= 2
+            f = ImageFont.truetype(self.path, size)
+        return f
+
+
+def paste_faded(frame, img, pos, alpha):
+    """Lay `img` on the frame at `pos`, through its own alpha thinned by `alpha`."""
+    if alpha >= 1.0:
+        frame.paste(img, pos, img)
+        return
+    mask = img.getchannel("A").point(lambda v: int(v * alpha))
+    frame.paste(img, pos, mask)
+
+
+def corner_name(title: str, key_shift: float, font, W: int, margin: int) -> str:
+    """What the corner says: the song's name, the key it was moved to when it
+    was, and an ellipsis where the frame runs out.
+
+    A song in another key is not the song as recorded, and a month later
+    nobody remembers why it sounds wrong. The frame says so where the name
+    is, and only when there is something to say.
+    """
+    if not title:
+        return ""
+    shown = title
+    if abs(key_shift) >= 0.01:
+        shown += f"  ·  {key_shift:+g}"
+    while len(shown) > 8 and font.getlength(shown) > W - 2 * margin:
+        shown = shown[:-2].rstrip() + "\u2026"
+    return shown
+
+
+def stamp_name(img, text: str, font, margin: int, H: int):
+    """The name in its corner, and the picture back. Painted into a still
+    background once; on a clip, where no two frames are the same picture,
+    painted onto each stretched field as it is made — still once per several
+    frames, never once per frame."""
+    if text:
+        from PIL import ImageDraw
+        ImageDraw.Draw(img).text((margin, int(H * 0.028)), text, font=font,
+                                 fill=(132, 140, 168), **edged(font))
+    return img
+
+
 class LineArt:
     """Prepared images of a line: dim and lit, plus the word positions.
 
@@ -803,35 +884,8 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
 
     W, H = args.width, args.height
     margin = int(W * 0.06)
-    font_path = find_font(args.font)
-    base_main = int(H * 0.072)
-    base_side = int(H * 0.042)
-    cache_font = {}
-
-    def font_for(text, max_w, main):
-        size = base_main if main else base_side
-        # the width belongs in the key: the same text is measured both against
-        # the frame and against nothing at all, to decide whether to wrap
-        key = (text, size, max_w)
-        if key in cache_font:
-            return cache_font[key]
-        f = ImageFont.truetype(font_path, size)
-        # the floor scales with the seat: a side font can start BELOW a fixed
-        # floor, and then a long line simply ran off the edge, unshrunk
-        floor = max(10, min(18, size - 2))
-        while size > floor and f.getlength(text) > max_w:
-            size -= 2
-            f = ImageFont.truetype(font_path, size)
-        cache_font[key] = f
-        return f
-
-    def fitted(text, size, max_w):
-        """A font of the asked size, stepped down until the text fits."""
-        f = ImageFont.truetype(font_path, size)
-        while size > 18 and f.getlength(text) > max_w:
-            size -= 2
-            f = ImageFont.truetype(font_path, size)
-        return f
+    fonts = Fonts(find_font(args.font), H)
+    font_path = fonts.path
 
     # One background — or a slow slideshow of them, when the cover came as
     # frames cut from the clip. Each carries the song's name; the switch is a
@@ -868,7 +922,7 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
                 # the oldest goes, not the whole shelf: clearing everything
                 # made the very lines on screen be typeset again
                 store.pop(next(iter(store)))
-            store[i] = LineArt(lines[i], font_for, W, margin, main,
+            store[i] = LineArt(lines[i], fonts.fit, W, margin, main,
                                align="right" if duo_side else "center")
         return store[i]
 
@@ -897,13 +951,6 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     STEP = y_next - y_main     # one line of the column
     SLIDE = 0.32               # how long the ride takes
     fading = getattr(args, "still", None) is None
-
-    def paste_faded(frame, img, pos, alpha):
-        if alpha >= 1.0:
-            frame.paste(img, pos, img)
-            return
-        mask = img.getchannel("A").point(lambda v: int(v * alpha))
-        frame.paste(img, pos, mask)
 
     def draw_notes(d, pic, line, t, y_line, alpha=1.0):
         """The melody of this line, mapped above it — a bar to a word.
@@ -1037,32 +1084,11 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
     # The name in the corner never changes, and drawing it anew on each of
     # thousands of frames was pure ceremony: it is painted into the background
     # once, and every frame starts from a copy that already carries it.
-    shown_name = ""
-    if title:
-        shown_name = title
-        # A song in another key is not the song as recorded, and a month later
-        # nobody remembers why it sounds wrong. The frame says so where the
-        # name is, and only when there is something to say.
-        if abs(key_shift) >= 0.01:
-            shown_name += f"  ·  {key_shift:+g}"
-        while len(shown_name) > 8 \
-                and name_font.getlength(shown_name) > W - 2 * margin:
-            shown_name = shown_name[:-2].rstrip() + "\u2026"
-
-    def stamp_name(img):
-        """The name in its corner. Painted into a still background once; on a
-        clip, where no two frames are the same picture, painted onto each
-        stretched field as it is made — still once per several frames, never
-        once per frame."""
-        if shown_name:
-            ImageDraw.Draw(img).text((margin, int(H * 0.028)), shown_name,
-                                     font=name_font, fill=(132, 140, 168),
-                                     **edged(name_font))
-        return img
+    shown_name = corner_name(title, key_shift, name_font, W, margin)
 
     if shown_name and not fields:
         for one in bgs:
-            stamp_name(one)
+            stamp_name(one, shown_name, name_font, margin, H)
 
     # The beat, when the song keeps one and the singer asked to see it. Four
     # dots in the bottom corner, one to a beat of the bar: enough to come in on
@@ -1136,9 +1162,9 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
 
     # The opening: the name held large, then three, two, one. The music is
     # delayed by exactly as long, so nobody is caught mid-breath.
-    card_font = (fitted(card_name, int(H * 0.095), W - 2 * margin)
+    card_font = (fonts.fitted(card_name, int(H * 0.095), W - 2 * margin)
                  if card_name and lead else None)
-    art_font = (fitted(card_artist, int(H * 0.042), W - 2 * margin)
+    art_font = (fonts.fitted(card_artist, int(H * 0.042), W - 2 * margin)
                 if card_artist and lead else None)
     num_font = ImageFont.truetype(font_path, int(H * 0.060)) if lead else None
 
@@ -1189,7 +1215,8 @@ def render(payload, audio_wav, out_path, args, on_progress=None):
             sm = field_at(t)
             sm = ImageEnhance.Brightness(sm).enhance(fit_dark(sm))
             held["slot"] = slot
-            held["img"] = stamp_name(_lay_scrim(sm.resize((W, H), Image.BILINEAR)))
+            held["img"] = stamp_name(_lay_scrim(sm.resize((W, H), Image.BILINEAR)),
+                                     shown_name, name_font, margin, H)
         return held["img"].copy()
 
     def bg_for(t):
