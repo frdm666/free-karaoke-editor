@@ -7,6 +7,34 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.54.0
+
+**A setting added to the program now reaches the settings file you already
+have.** `app/settings.ini` is yours: an update never overwrites it, and that
+is right — but it also meant that everyone who installed the program earlier
+kept a file frozen at the day it was made. A setting added since simply did
+not exist for them: no line to find, nothing to uncomment, no hint that there
+was anything to look for. The way past a video that asks you to sign in was
+learnt from the error message that appeared when it did not work, which is a
+poor place to keep instructions.
+
+The setup now compares your file with the example and writes at the end
+whatever is missing — with the example's own explanation, and switched off, so
+nothing you have chosen changes. Run `Install.bat` or `install.command` again
+and it happens once; a second run adds nothing, because a commented-out line
+still counts as a setting the file knows about.
+
+Cookies are the setting that made this plain, so the text that travels with
+them says more than it did. Name the browser you are signed in with —
+`yt-dlp-args = --cookies-from-browser firefox` — and the downloader takes the
+cookies out of it itself, freshly, on every download; `chrome` and `safari`
+work as well. An exported `cookies.txt` does the same job and is the thing to
+avoid: those lines are the account itself, past the password and past the
+second factor. If one has been seen by someone else, change the password —
+that is what ends the sessions written into it.
+
+---
+
 ## 4.53.0
 
 **The singer can be given a piece of the song instead of all of it.** Put the

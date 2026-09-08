@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import shutil
 import site
 import subprocess
@@ -149,6 +150,93 @@ def ask(question: str, default_yes: bool = True) -> bool:
     return ans[0] in "yдd1"
 
 
+# The names one setting can go under. settings.ini belongs to the person who
+# runs the program, so it may well say “движок = auto” where the example says
+# “align = auto” — and a setting already chosen must not be offered back in
+# the other language. The launcher's own table (tools/auto.py) is the source
+# of these; a test keeps the two from drifting apart.
+ALSO_KNOWN = {
+    "движок": "align",
+    "модель": "model", "whisper-model": "model",
+    "язык": "language", "lang": "language",
+    "минусовка": "instrumental", "separate": "instrumental",
+    "цвета": "colors",
+    "оформление": "theme",
+    "надписи": "ui-lang",
+    "кодек": "codec",
+    "встраивать": "embed",
+    "отделение": "separator",
+    "ключи-загрузчика": "yt-dlp-args",
+}
+
+# A settings line is a name, an “=”, and a value — commented out or not. The
+# comment matters: a switched-off line still means the setting is known here,
+# and that is what keeps a second run from writing everything twice.
+SETTING = re.compile(r"^\s*#?\s*([\w-]+)\s*=")
+
+
+def _mentioned(text: str) -> set:
+    """Every setting a text names, whether it is switched on or commented out."""
+    found = set()
+    for line in text.splitlines():
+        m = SETTING.match(line)
+        if m:
+            key = m.group(1).lower()
+            found.add(ALSO_KNOWN.get(key, key))
+    return found
+
+
+def _blocks(text: str) -> list:
+    """The example, cut into paragraphs: each setting with its explanation."""
+    out, cur = [], []
+    for line in text.splitlines():
+        if line.strip():
+            cur.append(line)
+        elif cur:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+def top_up(ini: str, example: str) -> list:
+    """Add to settings.ini the settings that appeared after it was made.
+
+    An update never overwrites settings.ini — it is the person's own file, and
+    that is right. But it also meant that for everyone who installed the
+    program earlier a new setting simply did not exist: no line to find and
+    nothing to uncomment, so the way to a locked video was learnt from an
+    error message instead of from the file that is supposed to hold it.
+
+    What is missing is appended with the example's own explanation and
+    switched off, so nothing that was chosen changes. Returns the names.
+    """
+    try:
+        have = _mentioned(open(ini, encoding="utf-8-sig").read())
+    except OSError:
+        return []
+    added, tail = [], []
+    for block in _blocks(example):
+        keys = _mentioned("\n".join(block))
+        if not keys or keys & have:
+            continue
+        added += sorted(keys)
+        tail.append("\n".join(ln if ln.lstrip().startswith("#") else "# " + ln
+                              for ln in block))
+    if not added:
+        return []
+    note = ("# Added by the setup: settings that were not yet in the program "
+            "when this\n# file was made. None of them is switched on — take "
+            "the “#” off a line to use it.")
+    try:
+        with open(ini, "a", encoding="utf-8") as f:
+            f.write("\n\n" + note + "\n\n" + "\n\n".join(tail) + "\n")
+    except OSError:
+        return []
+    return added
+
+
 def main() -> int:
     print("=" * 60)
     print(tr("  Setting up Karaoke", "  Настройка программы «Караоке»"))
@@ -266,6 +354,21 @@ def main() -> int:
     example = os.path.join(ROOT, "settings.example.ini")
     if os.path.isfile(ini):
         print(tr(f"   Already there: {ini}", f"   Уже есть: {ini}"))
+        fresh = (top_up(ini, open(example, encoding="utf-8").read())
+                 if os.path.isfile(example) else [])
+        if fresh:
+            names = ", ".join(fresh)
+            print(tr(f"   Added to the end, switched off, what was not in it "
+                     f"yet: {names}",
+                     f"   Дописал в конец, выключенными, чего в нём ещё не "
+                     f"было: {names}"))
+        if "yt-dlp-args" in fresh:
+            print(tr("   Cookies are among them: a video that asks you to sign "
+                     "in\n   is taken with “yt-dlp-args = "
+                     "--cookies-from-browser firefox”.",
+                     "   Среди них куки: видео, которое требует входа,\n"
+                     "   берётся строкой «yt-dlp-args = "
+                     "--cookies-from-browser firefox»."))
     elif os.path.isfile(example):
         try:
             text = open(example, encoding="utf-8").read()

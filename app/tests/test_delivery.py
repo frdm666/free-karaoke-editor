@@ -302,6 +302,48 @@ def main():
           args[args.index("--align") + 1] == "energy" and
           args[args.index("--ui-lang") + 1] == "ru", " ".join(args))
 
+    # An update never overwrites settings.ini — and for a long while that also
+    # meant a setting added later did not exist for anyone who had installed
+    # the program earlier: nothing to find in the file, nothing to uncomment.
+    # The way to a locked video was learnt from an error message instead. The
+    # setup now writes the missing ones at the end, switched off.
+    old = os.path.join(tmp, "old.ini")
+    open(old, "w", encoding="utf-8").write(
+        "# an old file of mine\nalign = auto\n\nmodel = small\n")
+    added = setup.top_up(old, ex_text)
+    body = open(old, encoding="utf-8").read()
+    check("the setup adds the settings that appeared later",
+          "yt-dlp-args" in added and "separator" in added, added)
+    check("and a setting already chosen is not offered back",
+          "align" not in added and "model" not in added, added)
+    check("what was chosen is left exactly as it was",
+          body.startswith("# an old file of mine\nalign = auto\n\nmodel = small\n"))
+    check("nothing it writes is switched on",
+          not [ln for ln in body.splitlines()[4:]
+               if re.match(r"^\s*[\w-]+\s*=", ln)],
+          [ln for ln in body.splitlines()[4:]
+           if re.match(r"^\s*[\w-]+\s*=", ln)][:2])
+    check("the explanation comes with them, cookies included",
+          "cookies" in body and "--cookies-from-browser" in body)
+    check("and the cookie file is called what it is",
+          "past the password" in body)
+    again = setup.top_up(old, ex_text)
+    check("a second setup run adds nothing", again == [], again)
+    check("and the file does not grow again",
+          open(old, encoding="utf-8").read() == body)
+    # “движок = auto” is “align = auto”: the same setting under its Russian
+    # name, and offering it again in English would be offering it twice.
+    ru = os.path.join(tmp, "ru.ini")
+    open(ru, "w", encoding="utf-8").write("движок = energy\nотделение = htdemucs\n")
+    ru_added = setup.top_up(ru, ex_text)
+    check("a Russian key counts as the setting it names",
+          "align" not in ru_added and "separator" not in ru_added, ru_added)
+    ru_keys = [k for k in list(auto.KEYS) + list(auto.FLAGS)
+               if re.search("[А-Яа-яЁё]", k)]
+    check("every Russian key the launcher reads is known to the setup",
+          all(k in setup.ALSO_KNOWN for k in ru_keys),
+          [k for k in ru_keys if k not in setup.ALSO_KNOWN])
+
     print("\nWhen something falls over")
     # A console window scrolls and the error is gone — that is exactly what
     # happened to a real report: “an error flashed by, I did not see which”.

@@ -222,11 +222,20 @@ the site — `pip install -U yt-dlp` — or the video wants you to be signed in,
 which means cookies:
 
 ```ini
-yt-dlp-args = --cookies-from-browser chrome
+yt-dlp-args = --cookies-from-browser firefox
 ```
 
-That line goes into `app/settings.ini`; `KARAOKE_YTDLP_ARGS` does the same from
-the environment. Everything in it is passed to `yt-dlp` as it is.
+You name the browser you are signed in with, and yt-dlp takes the cookies out
+of it itself, freshly, on every download; `chrome` and `safari` work as well,
+and firefox asks the fewest questions on a Mac. That line goes into
+`app/settings.ini`; `KARAOKE_YTDLP_ARGS` does the same from the environment.
+Everything in it is passed to `yt-dlp` as it is.
+
+An exported `cookies.txt` does the same job and is the thing to avoid. Those
+lines are the account itself — they go past the password and past the second
+factor — so do not keep one lying about and never send one to anybody. If one
+has been seen by someone else, change the password: that is what ends the
+sessions it holds.
 
 The song keeps the name it had where it came from — the file it landed in is
 called something that survives every file system (`Forevermore_[kBjKqBvbbjM]`),
@@ -642,7 +651,10 @@ output
 
 `app/settings.ini` holds the same options for the launcher scripts, with English
 key names (the Russian ones still work). That file is yours: it is not in the
-repository, so an update never overwrites it. `Install.bat` /
+repository, so an update never overwrites it — and when the program grows a
+setting your copy has never heard of, the setup writes it at the end, switched
+off and with its explanation, instead of leaving you to find out from an error
+message that it exists. `Install.bat` /
 `install.command` make it on the first run from `app/settings.example.ini`,
 which is the documented reference — copy it by hand if you prefer. Without any
 settings file the program simply uses its defaults.
