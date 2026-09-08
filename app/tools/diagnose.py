@@ -9,7 +9,6 @@ Prints a report — copy the whole of it into the chat.
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import re
@@ -44,19 +43,10 @@ def load_payload(html_path: str) -> dict:
 
 def track_duration(uri: str, tmp: str, name: str):
     """Track length: the audio is inside the page (data:) or in a file next to it."""
-    if uri.startswith("data:"):
-        head, _, b64 = uri.partition(",")
-        ext = ".mp3" if "mpeg" in head else (".ogg" if "ogg" in head else ".m4a")
-        path = os.path.join(tmp, name + ext)
-        with open(path, "wb") as f:
-            f.write(base64.b64decode(b64))
-        size = os.path.getsize(path)
-    else:
-        from urllib.parse import unquote
-        path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), unquote(uri))
-        if not os.path.isfile(path):
-            return None, 0
-        size = os.path.getsize(path)
+    path = AU.from_uri(uri, tmp, name, sys.argv[1])
+    if not path:
+        return None, 0
+    size = os.path.getsize(path)
     try:
         return AU.duration(path), size
     except Exception:

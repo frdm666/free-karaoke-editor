@@ -1311,8 +1311,8 @@ async function showDir(path){
   body.dataset.parent = d.parent;
   body.innerHTML = "";
   if (pickTarget === "lyrics2") await foundRows(body);
-  if (pickTarget === "cover") coverUrlRow(body);
-  if (pickTarget === "backdrop") backdropUrlRow(body);
+  if (pickTarget === "cover") urlRow(body, T.coverUrlPh, takeCover);
+  if (pickTarget === "backdrop") urlRow(body, T.backdropUrlPh, takeBackdrop);
   (d.drives||[]).forEach(dr => body.appendChild(row("💽", dr, () => showDir(dr))));
   d.dirs.forEach(x => body.appendChild(row("📁", x.name, () => showDir(x.path))));
   d.files.forEach(x => body.appendChild(row("🎵", x.name, () => {
@@ -4102,22 +4102,23 @@ $("btnCoverOff").addEventListener("click", async () => {
     refreshCover(); toast(T.coverGone);
   }catch(e){ toast(e.message); }
 });
-// A cover can come by link too: a row above the files takes the address.
-function coverUrlRow(box){
+// A cover or a clip can come by link too: a row above the files takes the
+// address and hands it to whatever is being fetched.
+function urlRow(box, placeholder, take){
   const r = document.createElement("div");
   r.className = "row urlrow";
   r.innerHTML = '<span class="ic">🔗</span>' +
     '<input class="nm" type="text">' +
     '<button class="words"></button>';
   const inp = r.querySelector("input");
-  inp.placeholder = T.coverUrlPh;
+  inp.placeholder = placeholder;
   const btn = r.querySelector("button");
   btn.textContent = T.coverUrlGo;
   const go = () => {
     const url = inp.value.trim();
     if (!/^https?:\/\//.test(url)) return toast(T.coverUrlBad);
     $("browser").classList.add("hide");
-    takeCover(null, url);
+    take(null, url);
   };
   btn.addEventListener("click", go);
   inp.addEventListener("keydown", e => {
@@ -4153,30 +4154,6 @@ async function takeBackdrop(path, url){
     refreshBackdrop(); toast(T.backdropSet);
     refreshStill();
   }catch(e){ toast(e.message); }
-}
-function backdropUrlRow(box){
-  const r = document.createElement("div");
-  r.className = "row urlrow";
-  r.innerHTML = '<span class="ic">🔗</span>' +
-    '<input class="nm" type="text">' +
-    '<button class="words"></button>';
-  const inp = r.querySelector("input");
-  inp.placeholder = T.backdropUrlPh;
-  const btn = r.querySelector("button");
-  btn.textContent = T.coverUrlGo;
-  const go = () => {
-    const url = inp.value.trim();
-    if (!/^https?:\/\//.test(url)) return toast(T.coverUrlBad);
-    $("browser").classList.add("hide");
-    takeBackdrop(null, url);
-  };
-  btn.addEventListener("click", go);
-  inp.addEventListener("keydown", e => {
-    e.stopPropagation();
-    if (e.key === "Enter") go();
-  });
-  inp.addEventListener("click", e => e.stopPropagation());
-  box.appendChild(r);
 }
 $("btnClipBg").addEventListener("click", () => openBrowser("backdrop"));
 $("btnClipBgOff").addEventListener("click", async () => {

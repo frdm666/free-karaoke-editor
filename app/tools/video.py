@@ -406,18 +406,9 @@ def _extract_audio(payload: dict, html_path: str, tmp: str, mode: str) -> str:
     """Pull the needed track out of the page (or a file next to it) into WAV."""
     srcs = {}
     for name, uri in payload.get("audio", {}).items():
-        if uri.startswith("data:"):
-            head, _, b64 = uri.partition(",")
-            ext = ".mp3" if "mpeg" in head else (".ogg" if "ogg" in head else ".m4a")
-            path = os.path.join(tmp, name + ext)
-            with open(path, "wb") as f:
-                f.write(base64.b64decode(b64))
-        else:
-            from urllib.parse import unquote
-            path = os.path.join(os.path.dirname(os.path.abspath(html_path)), unquote(uri))
-            if not os.path.isfile(path):
-                continue
-        srcs[name] = path
+        path = AU.from_uri(uri, tmp, name, html_path)
+        if path:
+            srcs[name] = path
 
     if not srcs:
         raise SystemExit(tr("The page has no audio.", "В странице нет звука."))

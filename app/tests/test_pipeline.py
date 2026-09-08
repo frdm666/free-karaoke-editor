@@ -2676,6 +2676,16 @@ def main():
     os.environ["KARAOKE_YTDLP_ARGS"] = "--cookies-from-browser chrome"
     check("what the settings add is passed on",
           FE.extra_args() == ["--cookies-from-browser", "chrome"], FE.extra_args())
+    # shlex reads a backslash as an escape, so a Windows path in the keys came
+    # out as C:Usersmecookies.txt — a file that never existed.
+    win = FE._split_args(r'--cookies "C:\Users\my name\cookies.txt" --sleep 1', True)
+    check("a Windows path in the keys keeps its backslashes",
+          win == ["--cookies", r"C:\Users\my name\cookies.txt", "--sleep", "1"], win)
+    check("and a POSIX one is split as it always was",
+          FE._split_args("--cookies '/home/me/c.txt' -v", False)
+          == ["--cookies", "/home/me/c.txt", "-v"])
+    check("an unbalanced quote gives nothing, not a crash",
+          FE._split_args('--cookies "oops', False) == [])
     os.environ["KARAOKE_STUB_LOG"] = attempts
     FE.download("https://example.com/watch?v=cookie", inbox)
     check("and it really lands in the command line",

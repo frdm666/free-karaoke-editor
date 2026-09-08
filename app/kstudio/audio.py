@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -11,6 +12,7 @@ import sys
 from .i18n import tr
 from array import array
 from typing import List, Optional, Tuple
+from urllib.parse import unquote
 
 _FFMPEG: Optional[str] = None
 _FFPROBE: Optional[str] = None
@@ -134,6 +136,25 @@ def ensure_on_path() -> None:
 
 def _run(cmd: List[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kw)
+
+
+def from_uri(uri: str, tmp: str, name: str, beside: str) -> Optional[str]:
+    """A track a page names, as a file on disk — or None when there is none.
+
+    The page carries its sound either inside itself, as a data: URI that is
+    decoded into `tmp` under `name` and the extension its type says, or as a
+    file next to the page, named relative to it — `beside` is the page's own
+    path. The video and the diagnosis each had their own copy of this.
+    """
+    if uri.startswith("data:"):
+        head, _, b64 = uri.partition(",")
+        ext = ".mp3" if "mpeg" in head else (".ogg" if "ogg" in head else ".m4a")
+        path = os.path.join(tmp, name + ext)
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(b64))
+        return path
+    path = os.path.join(os.path.dirname(os.path.abspath(beside)), unquote(uri))
+    return path if os.path.isfile(path) else None
 
 
 def duration(path: str) -> float:

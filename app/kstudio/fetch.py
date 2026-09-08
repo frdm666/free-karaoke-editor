@@ -98,6 +98,20 @@ def extra_args() -> list:
     """
     raw = ((os.environ.get("KARAOKE_YTDLP_ARGS") or "").strip()
            or _setting("yt-dlp-args", "ключи-загрузчика"))
+    return _split_args(raw, os.name == "nt")
+
+
+def _split_args(raw: str, windows: bool) -> list:
+    """The person's own keys, split the way a shell would split them.
+
+    shlex splits POSIX-style and reads a backslash as an escape, so on Windows
+    a path in there — C:\\Users\\me\\cookies.txt — came out as
+    C:Usersmecookies.txt, and yt-dlp went looking for a file that never
+    existed. Doubling the backslashes first keeps them; quotes around a path
+    with a space in it still work as they always did.
+    """
+    if windows:
+        raw = raw.replace("\\", "\\\\")
     try:
         return shlex.split(raw)
     except ValueError:
@@ -496,6 +510,43 @@ def _empty(folder: str) -> None:
             pass
 
 
+def _ask_every_client(base: Callable[[], list], url: str, say: Callable,
+                      deadline: float, tmp: str) -> None:
+    """Run the downloader as each client in turn until one gets through.
+
+    A refusal aimed at the client rather than at the video — “the page needs
+    to be reloaded”, a bot check, a sign-in wall — is not passed on until
+    every client has been turned away: YouTube says it to one player and hands
+    the sound to the next. `base` builds the arguments of one attempt; the
+    client and the person's own keys are added here. Sound and clip used to
+    carry this loop each, and the advice at the end of it was on one only.
+    """
+    for i, client in enumerate(CLIENTS):
+        args = base()
+        if client:
+            args += ["--extractor-args", f"youtube:player_client={client}"]
+        args += extra_args() + ["--", url]
+        code, lines = _attempt(args, say, deadline)
+        if code == 0:
+            return
+        reason = _reason(lines, code)
+        again = bool(TRY_AGAIN.search("\n".join(lines[-8:])))
+        if again and i + 1 < len(CLIENTS):
+            say(tr(f"The site turned this client away ({reason}) — "
+                   f"asking again as “{CLIENTS[i + 1]}”…",
+                   f"Сайт отказал этому клиенту ({reason}) — "
+                   f"спрашиваю ещё раз как «{CLIENTS[i + 1]}»…"))
+            _empty(tmp)
+            continue
+        if again:
+            raise FetchError(reason + tr(
+                f" — and every player was turned away. The downloader is "
+                f"probably older than the site: {STALE[0]}. ",
+                f" — и отказано каждому клиенту. Скорее всего загрузчик "
+                f"старше сайта: {STALE[0]}. ") + cookie_advice())
+        raise FetchError(reason)
+
+
 def download(url: str, dest_dir: str, log: Optional[Callable] = None) -> dict:
     """Put the sound of `url` into `dest_dir` and say what came out.
 
@@ -519,30 +570,7 @@ def download(url: str, dest_dir: str, log: Optional[Callable] = None) -> dict:
     deadline = time.time() + TIMEOUT
     say(tr("Taking the sound from the link…", "Достаю звук по ссылке…"))
     try:
-        for i, client in enumerate(CLIENTS):
-            args = _base_args(cmd, tmp)
-            if client:
-                args += ["--extractor-args", f"youtube:player_client={client}"]
-            args += extra_args() + ["--", url]
-            code, lines = _attempt(args, say, deadline)
-            if code == 0:
-                break
-            reason = _reason(lines, code)
-            again = bool(TRY_AGAIN.search("\n".join(lines[-8:])))
-            if again and i + 1 < len(CLIENTS):
-                say(tr(f"The site turned this client away ({reason}) — "
-                       f"asking again as “{CLIENTS[i + 1]}”…",
-                       f"Сайт отказал этому клиенту ({reason}) — "
-                       f"спрашиваю ещё раз как «{CLIENTS[i + 1]}»…"))
-                _empty(tmp)
-                continue
-            if again:
-                raise FetchError(reason + tr(
-                    f" — and every player was turned away. The downloader is "
-                    f"probably older than the site: {STALE[0]}. ",
-                    f" — и отказано каждому клиенту. Скорее всего загрузчик "
-                    f"старше сайта: {STALE[0]}. ") + cookie_advice())
-            raise FetchError(reason)
+        _ask_every_client(lambda: _base_args(cmd, tmp), url, say, deadline, tmp)
         info = _info(tmp)
         got = _pick(tmp)
         dst = _free_name(dest_dir, os.path.basename(got))
@@ -604,27 +632,15 @@ def clip(url: str, dest_dir: str, log: Optional[Callable] = None) -> str:
     say(tr("Taking the clip from the link, at its smallest…",
            "Достаю клип по ссылке, в самом мелком виде…"))
     try:
-        for i, client in enumerate(CLIENTS):
-            args = list(cmd) + [
-                "--no-playlist", "--newline", "--no-colors",
-                "--retries", "3", "--socket-timeout", "30",
-                "--max-filesize", f"{CLIP_MAX_MB}m",
-                # smallest picture, and no sound: the song brought its own
-                "-f", "worstvideo[height>=144]/worstvideo/worst",
-                "--restrict-filenames",
-                "-o", os.path.join(tmp, "clip.%(ext)s"),
-            ]
-            if client:
-                args += ["--extractor-args", f"youtube:player_client={client}"]
-            args += extra_args() + ["--", url]
-            code, lines = _attempt(args, say, deadline)
-            if code == 0:
-                break
-            reason = _reason(lines, code)
-            if bool(TRY_AGAIN.search("\n".join(lines[-8:]))) and i + 1 < len(CLIENTS):
-                _empty(tmp)
-                continue
-            raise FetchError(reason)
+        _ask_every_client(lambda: list(cmd) + [
+            "--no-playlist", "--newline", "--no-colors",
+            "--retries", "3", "--socket-timeout", "30",
+            "--max-filesize", f"{CLIP_MAX_MB}m",
+            # smallest picture, and no sound: the song brought its own
+            "-f", "worstvideo[height>=144]/worstvideo/worst",
+            "--restrict-filenames",
+            "-o", os.path.join(tmp, "clip.%(ext)s"),
+        ], url, say, deadline, tmp)
         got = sorted(os.listdir(tmp))
         if not got:
             raise FetchError(tr("the link gave no picture",
