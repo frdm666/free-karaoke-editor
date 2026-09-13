@@ -476,7 +476,11 @@ one pause is not counted twice over; **`dots on long waits`** gives you both
 where you want both.
 
 The timeline zooms down to half a second across, which is close enough to
-place a word by eye. And **holding Alt while dragging** puts a line exactly
+place a word by eye. While the song stands still the window holds: a press on
+empty timeline moves the playhead to the press and nothing else moves, and
+zooming keeps the playhead where it is on the screen; the window follows the
+playhead while the song plays, and lets go when a seek carries the playhead
+out of it. And **holding Alt while dragging** puts a line exactly
 where your hand puts it — the magnet that pulls to the start of a phrase, or
 to the beat, is a help until the moment it is not.
 

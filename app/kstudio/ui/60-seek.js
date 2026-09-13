@@ -306,7 +306,12 @@ $("btnTapTempo").addEventListener("click", () => {
 // floor used to be four seconds, and at four seconds the magnet still reaches
 // a couple of frames either side — so the one thing a person could do about it,
 // zoom in further, was the one thing they could not do.
-function setZoom(z){ zoom=clamp(z,0.5,120);
+function setZoom(z){
+  const t = mediaTime(), was = zoom;
+  zoom = clamp(z, 0.5, 120);
+  // a window that stands still zooms around the playhead: it keeps its place
+  // on the screen instead of leaping back to a third of the way across
+  if (!playing && viewAt !== null) viewAt = t - (t - viewAt) / was * zoom;
   $("zoomNote").textContent=zoomText(); layoutBlocks(); drawWave(); drawBlocks(); }
 function zoomText(){
   return (zoom < 2 ? zoom.toFixed(1) : String(Math.round(zoom))) + T.sec;
@@ -320,6 +325,9 @@ $("btnFit").addEventListener("click", () => {
   const span = Math.max(ln.end - ln.start, 0.4);
   setZoom(clamp(span * 1.6, 4, 120));
   seek(Math.max(0, ln.start - span * 0.15));
+  // the whole line in the window, a little air on the left
+  if (!playing) viewAt = Math.max(0, ln.start - span * 0.2);
+  drawWave(); drawBlocks();
 });
 $("btnZoomOut").addEventListener("click", ()=>setZoom(zoom*1.6));
 

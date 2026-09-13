@@ -1,7 +1,21 @@
 /* ================= the timeline ================= */
 let zoom = 15;                  // how many seconds are visible
+let viewAt = null;              // where the window begins while the song stands still
 function pps(){ return $("tlwrap").clientWidth / zoom; }   // pixels per second
-function viewStart(){ return clamp(mediaTime() - zoom*0.35, 0, Math.max(dur-zoom,0)); }
+// While the song plays the window follows the playhead, which stands a third
+// of the way across. While the song stands still the window holds: a press on
+// the timeline moves the playhead to the press, not the timeline under the
+// hand. It used to follow always — a press left of the playhead sent the
+// whole track sliding right, so that the point pressed came to rest under a
+// playhead that had never moved, and the eye read it as a jump the wrong way.
+// The window lets go only when the playhead leaves it.
+function viewStart(){
+  const t = mediaTime(), hi = Math.max(dur - zoom, 0);
+  const follow = clamp(t - zoom*0.35, 0, hi);
+  if (playing){ viewAt = null; return follow; }
+  if (viewAt === null || t < viewAt || t > viewAt + zoom) viewAt = follow;
+  return clamp(viewAt, 0, hi);
+}
 function xOf(t){ return (t - viewStart()) * pps(); }
 function tOf(x){ return viewStart() + x / pps(); }
 

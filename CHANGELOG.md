@@ -7,6 +7,24 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.58.0
+
+**A press on the timeline moves the playhead — not the timeline.** The window
+used to keep the playhead a third of the way across at all times, so a press
+to the LEFT of it sent the whole track sliding RIGHT until the pressed point
+came to rest under a playhead that had never moved. The eye read that as a
+jump the wrong way, and it was the one thing a person could not stop doing.
+
+While the song stands still the window holds now: the playhead goes to the
+press, the blocks and the waveform stay where they are, and zooming in keeps
+the playhead where it is on the screen instead of leaping back to a third of
+the way across. The window follows the playhead while the song plays, and
+lets go when a seek carries the playhead out of it. "Fit" shows the whole line
+with a little air on the left. A real-browser check presses left of the
+playhead and reads where everything stands afterwards.
+
+---
+
 ## 4.57.0
 
 **A tidy-up of the code, asked for and given in full.** Nothing here changes
