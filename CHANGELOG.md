@@ -7,6 +7,23 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.59.0
+
+**The page's colours stay on the page.** The background and text colours a
+person picks are the look of the finished page, and the lyrics stage in the
+window is that page's preview — so it takes them. The window around it used
+to take them too: an orange page made an orange editor, buttons, panels and
+timeline included, and the tool could not be told from the work. The panels,
+the buttons and the timeline keep the editor's own dark look now, whatever
+the page is painted. A real-browser check paints the page orange and reads
+the colours of the window, the buttons and the stage afterwards.
+
+**And the Frame button is a switch.** A press opens the frame, the next one
+closes it, and the button stays lit while the frame is open. It used to open
+only; the way out was the cross in the frame's corner.
+
+---
+
 ## 4.58.0
 
 **A press on the timeline moves the playhead — not the timeline.** The window

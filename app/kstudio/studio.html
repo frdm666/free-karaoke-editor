@@ -11,6 +11,8 @@
   :root{
     --bg:#0a0b14; --bg2:#141830; --panel:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
     --dim:#5d6480; --text:#e8ebf5; --muted:#8b93b0;
+    /* the page's own look — it lives on the stage and nowhere else */
+    --page-bg:#0a0b14; --page-text:#e8ebf5; --page-dim:#5d6480;
     --accent:#4de1ff; --accent-2:#ff8ad1; --accent2:#ffcc4d; --bad:#ff7a7a; --ok:#7ee08a;
   }
   *{box-sizing:border-box; margin:0; padding:0}
@@ -196,6 +198,7 @@
      the top and bottom, and the pill faded with it until unreadable. */
   .stagewrap{flex:1; position:relative; overflow:hidden; min-width:0; display:flex}
   .stage{flex:1; position:relative; overflow:hidden; min-width:0;
+    background:var(--page-bg);
     -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 84%,transparent 100%);
     mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 84%,transparent 100%)}
   .scroll{position:absolute; left:0; right:0; top:0; padding:34vh 4vw 40vh;
@@ -218,9 +221,9 @@
     background:rgba(255,255,255,.16); overflow:hidden}
   .wait .rail .fill{height:100%; width:0; border-radius:999px; background:var(--accent)}
   .ln{font-size:clamp(20px,2.5vw,34px); line-height:1.3; font-weight:700; text-align:center;
-    color:var(--dim); padding:.28em .3em; cursor:pointer; opacity:.45; border-radius:8px;
+    color:var(--page-dim); padding:.28em .3em; cursor:pointer; opacity:.45; border-radius:8px;
     transition:opacity .25s, color .25s}
-  .ln.cur{opacity:1; color:var(--text)}
+  .ln.cur{opacity:1; color:var(--page-text)}
   .ln.done{opacity:.3}
   .ln.sel{background:rgba(255,204,77,.1); box-shadow:inset 0 0 0 1px rgba(255,204,77,.4)}
   /* The selected batch: it is visible what the next action applies to. */
@@ -229,7 +232,7 @@
   /* The selected batch has to catch the eye, or it is unclear whether anything
      got selected at all. */
   .ln.mark{background:rgba(77,225,255,.22); box-shadow:inset 0 0 0 2px rgba(77,225,255,.75);
-    opacity:1; color:var(--text)}
+    opacity:1; color:var(--page-text)}
   .ln.mark::after{content:"✓"; color:var(--accent); font-size:.5em; margin-left:.5em;
     vertical-align:middle; opacity:.9}
   .blk.mark{outline:2px solid rgba(77,225,255,.85); outline-offset:-2px;
@@ -241,7 +244,7 @@
   /* editing the text right on the stage: same size and weight, so the line does
      not jump under the cursor on a double click */
   .lnedit{font:inherit; font-size:inherit; font-weight:inherit; text-align:center;
-    width:100%; color:var(--text); background:rgba(255,255,255,.07);
+    width:100%; color:var(--page-text); background:rgba(255,255,255,.07);
     border:1px solid var(--accent); border-radius:8px; padding:.1em .3em; outline:none}
   .ln .w{position:relative; display:inline-block; white-space:pre}
   .ln .w .hl{position:absolute; left:0; top:0; width:0; overflow:hidden; white-space:pre;

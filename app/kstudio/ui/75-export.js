@@ -111,9 +111,14 @@ function stillFollow(){
   clearTimeout(stillTimer);
   stillTimer = setTimeout(() => showStill(mediaTime(), false), 350);
 }
+// Open or shut, in one place: the box and the button that stands for it.
+function stillOpen(on){
+  $("stillBox").classList.toggle("hide", !on);
+  $("btnStill").classList.toggle("on", on);
+}
 async function showStill(at, opening){
-  const box = $("stillBox"), img = $("stillImg");
-  box.classList.remove("hide");
+  const img = $("stillImg");
+  stillOpen(true);
   stillT = opening ? 0 : Math.max(0, at);
   $("stillAt").textContent = opening ? T.stillOpeningAt : T.stillAt(fmt(at));
   // Asked for in the song's own time: the clip runs ahead of it by the length
@@ -125,7 +130,7 @@ async function showStill(at, opening){
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
     img.src = URL.createObjectURL(await r.blob());
   }catch(e){
-    box.classList.add("hide");
+    stillOpen(false);
     toast(T.stillFailed + e.message);
   }
 }
@@ -251,9 +256,14 @@ $("btnClipBgOff").addEventListener("click", async () => {
   }catch(e){ toast(e.message); }
 });
 
-$("btnStill").addEventListener("click", () => showStill(mediaTime(), false));
+// The button is a switch: a press opens the frame, the next one closes it.
+// It used to open only, and the way out was the cross in the frame's corner.
+$("btnStill").addEventListener("click", () => {
+  if ($("stillBox").classList.contains("hide")) showStill(mediaTime(), false);
+  else stillOpen(false);
+});
 $("stillOpening").addEventListener("click", () => showStill(0, true));
-$("stillHide").addEventListener("click", () => $("stillBox").classList.add("hide"));
+$("stillHide").addEventListener("click", () => stillOpen(false));
 $("stillPrev").addEventListener("click", () => showStill(Math.max(0, stillT - 2), false));
 $("stillNext").addEventListener("click", () => showStill(Math.min(dur, stillT + 2), false));
 

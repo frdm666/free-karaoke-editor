@@ -41,7 +41,7 @@ UI_DIR = os.path.join(ROOT, "tests", "ui")
 # These suites need a real browser: they check what the cursor actually hits,
 # and jsdom does not do hit-testing at all.
 def NEEDS_BROWSER(name: str) -> bool:
-    return any(k in name for k in ("real-mouse", "word-length", "replace-track", "scroll-and-end", "quiet-and-voice", "two-lanes", "requirements", "duo-layout", "multiselect", "link-live", "notext-live", "mark-live", "split-join", "clip-marks", "layout", "page-cover", "name-live", "tools-live", "timeline-live"))
+    return any(k in name for k in ("real-mouse", "word-length", "replace-track", "scroll-and-end", "quiet-and-voice", "two-lanes", "requirements", "duo-layout", "multiselect", "link-live", "notext-live", "mark-live", "split-join", "clip-marks", "layout", "page-cover", "name-live", "tools-live", "timeline-live", "look-live", "frame-live"))
 sys.path.insert(0, ROOT)
 
 

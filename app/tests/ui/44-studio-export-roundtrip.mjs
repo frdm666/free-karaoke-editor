@@ -118,6 +118,7 @@ ok('the line with the original is marked and labelled',
 const root2 = d2.documentElement.style;
 ok('the second colour is applied', root2.getPropertyValue('--accent-2').trim() === '#ee2288',
    root2.getPropertyValue('--accent-2'));
+// this is the finished page, and the page's look is the whole page's look
 ok('the background is applied', root2.getPropertyValue('--bg').trim() === '#101018',
    root2.getPropertyValue('--bg'));
 ok('the page has no JS errors', dom2.window.__errs.length === 0,

@@ -365,11 +365,14 @@ function applyColors(){
   root.setProperty("--accent", colors[0]);
   root.setProperty("--accent-2", colors[1]);
   $("col1").value = colors[0]; $("col2").value = colors[1];
-  root.setProperty("--bg", theme[0]);
-  root.setProperty("--bg2", theme[0]);
-  root.setProperty("--text", theme[1]);
+  // The look a person picks is the page's look, and the stage with the
+  // lyrics is the page's preview: it takes the colours. The window around it
+  // does not — panels, buttons and the timeline keep their own. They used to
+  // take them too, and an orange page turned the whole editor orange.
+  root.setProperty("--page-bg", theme[0]);
+  root.setProperty("--page-text", theme[1]);
   const t = rgbOf(theme[1]), b = rgbOf(theme[0]);
-  if (t && b) root.setProperty("--dim", hex(t.map((v,i) => v*0.55 + b[i]*0.45)));
+  if (t && b) root.setProperty("--page-dim", hex(t.map((v,i) => v*0.55 + b[i]*0.45)));
   $("colBg").value = theme[0]; $("colTx").value = theme[1];
   document.querySelectorAll(".sw").forEach(b => {
     b.style.background = $(b.dataset.for).value;

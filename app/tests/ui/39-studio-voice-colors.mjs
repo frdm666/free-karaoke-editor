@@ -65,14 +65,19 @@ console.log('\n--- the look ---');
 $("colBg").value = "#101820";
 $("colBg").dispatchEvent(new w.Event('input',{bubbles:true}));
 await sleep(150);
-ok('the window background changed',
-   doc.documentElement.style.getPropertyValue('--bg').trim() === '#101820',
+ok('the stage took the background',
+   doc.documentElement.style.getPropertyValue('--page-bg').trim() === '#101820',
+   doc.documentElement.style.getPropertyValue('--page-bg'));
+// …and the window around it did not: an orange page used to make an orange
+// editor, timeline and all
+ok('and the window kept its own',
+   doc.documentElement.style.getPropertyValue('--bg').trim() === '',
    doc.documentElement.style.getPropertyValue('--bg'));
 // a deliberately unreadable pair: dark letters on a dark background
 $("colTx").value = "#151d26";
 $("colTx").dispatchEvent(new w.Event('input',{bubbles:true}));
 await sleep(150);
-const tx = doc.documentElement.style.getPropertyValue('--text').trim();
+const tx = doc.documentElement.style.getPropertyValue('--page-text').trim();
 ok('letters that blended into the background were lightened', tx !== '#151d26', tx);
 
 console.log('\n--- all of it survives to the disk ---');
