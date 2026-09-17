@@ -254,6 +254,19 @@ class Lyrics:
 # by syllable — and it is never shown: on screen the word is whole again. The
 # soft hyphen is understood too, for text pasted from elsewhere.
 SYL_MARK = "=\u00ad"
+# …and it is a syllable break only INSIDE a word: “ко=ло=ко=ла”. Standing on
+# its own between spaces it is an equals sign, and a song may well have one.
+MARK_INSIDE = re.compile(r"(?<=\S)[" + SYL_MARK + r"](?=\S)")
+
+
+def _shown_words(text: str) -> List["Word"]:
+    """The side of a line that is only shown, cut into words.
+
+    Nothing here is sung, so nothing here is broken into syllables: “Σ an = S”
+    is a formula, and the “=” that marks a syllable break in a sung word is an
+    equals sign in it. What is written is what stands.
+    """
+    return [Word(tok) for tok in text.split()]
 
 
 def _split_words(text: str) -> List[Word]:
@@ -267,10 +280,13 @@ def _split_words(text: str) -> List[Word]:
     out: List[Word] = []
     pending = ""
     for tok in text.split():
-        if normalize_token(tok):
-            # a word broken into syllables is several timed pieces that read
-            # as one word: the first stands on its own, the rest are glued
-            parts = [q for q in re.split("[" + SYL_MARK + "]", tok) if q]
+        # a word broken into syllables is several timed pieces that read as one
+        # word: the first stands on its own, the rest are glued. A token that
+        # is nothing BUT marks — a lone “=” between two spaces — breaks into no
+        # pieces at all, and asking for the first of them threw the parser out
+        # on any line with an equals sign in it.
+        parts = [q for q in re.split("[" + SYL_MARK + "]", tok) if q]
+        if normalize_token(tok) and parts:
             first = (pending + " " + parts[0]).strip() if pending else parts[0]
             out.append(Word(first))
             for extra in parts[1:]:
@@ -408,8 +424,8 @@ def parse(raw: str) -> Lyrics:
             continue
         # the marks split the timing, never the reading: what is shown is the
         # line without them
-        shown = re.sub("[" + SYL_MARK + "]", "", line)
-        trail_shown = re.sub("[" + SYL_MARK + "]", "", trail) if trail else trail
+        shown = MARK_INSIDE.sub("", line)
+        trail_shown = MARK_INSIDE.sub("", trail) if trail else trail
 
         saw_content = True
         if start is not None:
@@ -422,8 +438,8 @@ def parse(raw: str) -> Lyrics:
                                   start=start, end=finish,
                                   held=finish is not None, backing=backing,
                                   voice=voice or (2 if backing else cur_voice),
-                                  shown_words=_split_words(shown_src) if shown_src else [],
-                                  shown_text=(re.sub("[" + SYL_MARK + "]", "", shown_src)
+                                  shown_words=_shown_words(shown_src) if shown_src else [],
+                                  shown_text=(" ".join(shown_src.split())
                                               if shown_src else None)))
             if trail:
                 lyr.lines.append(Line(text=trail_shown, words=_split_words(trail),

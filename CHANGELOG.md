@@ -29,6 +29,16 @@ replaced — now keeps the times measured word by word instead of being spread
 evenly across its span. And the message for a text that meets nothing in the
 recording says so, and names the likely reasons in the order they happen.
 
+Writing the signs down turned up an older fault of its own. “=” marks a
+syllable break inside a word — “ко=ло=ко=ла” — and a token made of nothing but
+marks broke into no pieces at all, so the parser asked for the first of none
+and fell over. Any line with an equals sign standing on its own did that, bar
+or no bar, which a song about mathematics has in every second line. A mark
+between two spaces is an equals sign now and stays in the reading; only the
+one inside a word still breaks it. And the shown side of a line is never
+broken into syllables at all — it is not sung, and a formula keeps every sign
+it was written with.
+
 ---
 
 ## 4.59.0

@@ -353,6 +353,32 @@ def main():
     check("and a line that shows what it sings keeps no such note",
           "sung" not in two.lines[2].to_json())
 
+    # “=” marks a syllable break inside a word — “ко=ло=ко=ла” — and a token
+    # made of nothing but marks broke into no pieces at all, so asking for the
+    # first of them threw the parser out. Any line with an equals sign in it
+    # did that, bar or no bar: a song about mathematics could not be read.
+    eq = _parse("Если a = b то всё сходится\nко=ло=ко=ла\n")
+    check("a line with a standalone “=” is read at all",
+          len(eq.lines) == 2, str([l.text for l in eq.lines]))
+    check("and the sign is not lost from the reading",
+          "=" in eq.lines[0].text, eq.lines[0].text)
+    check("a mark inside a word still breaks it into timed pieces",
+          [(w.text, w.glue) for w in eq.lines[1].words]
+          == [("ко", False), ("ло", True), ("ко", True), ("ла", True)],
+          str([(w.text, w.glue) for w in eq.lines[1].words]))
+    check("and there it is not shown", eq.lines[1].text == "колокола", eq.lines[1].text)
+    # The shown side is not sung, so nothing in it is a syllable break: a
+    # formula keeps every sign it was written with.
+    formula = _parse("Сходящийся ряд! | Σ an = S;\nГрадиент!!! | ∇f\n")
+    check("the shown side keeps its equals sign",
+          [w.text for w in formula.lines[0].shown_words] == ["Σ", "an", "=", "S;"],
+          str([w.text for w in formula.lines[0].shown_words]))
+    check("and reads back exactly as written",
+          formula.lines[0].shown_text == "Σ an = S;", formula.lines[0].shown_text)
+    check("a sign that is one word stays one word",
+          [w.text for w in formula.lines[1].shown_words] == ["∇f"],
+          str([w.text for w in formula.lines[1].shown_words]))
+
     print("\nExtracting the voice against a foreign master")
     _voc_checks()
 
