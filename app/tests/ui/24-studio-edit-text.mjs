@@ -111,6 +111,27 @@ ok('empty text did not wipe the line', after3[I].text === NEW, after3[I].text);
 ok('the number of lines did not change', after3.length === before.length,
    `${before.length} → ${after3.length}`);
 
+console.log('\n--- as many words as before: each keeps its own time ---');
+// A line rewritten whole — signs put where the words are sung, or a misheard
+// line typed out again — used to be spread evenly across its span, throwing
+// away the very times the model had measured word by word.
+const wasW = after[I].words.map(w => ({t: w.t, d: w.d}));
+const SAME = wasW.map((_, k) => 'знак' + (k + 1)).join(' ');
+dbl(doc.querySelectorAll('#scroll .ln')[I]);
+await sleep(200);
+inp = doc.querySelector('.lnedit');
+inp.value = SAME;
+keyOn(inp, 'Enter');
+await sleep(900);
+const swapped = await srv();
+ok('the new text is there', swapped[I].text === SAME, swapped[I].text);
+ok('and every word kept the time of the one it replaced',
+   swapped[I].words.length === wasW.length &&
+   swapped[I].words.every((w, k) => Math.abs(w.t - wasW[k].t) < 1e-6 &&
+                                    Math.abs(w.d - wasW[k].d) < 1e-6),
+   swapped[I].words.map(w => w.t.toFixed(2)).join(' ') + ' vs ' +
+   wasW.map(w => w.t.toFixed(2)).join(' '));
+
 console.log('\n--- editing can be found without knowing about the double click ---');
 const click = id => $(id).dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
 doc.querySelectorAll('#scroll .ln')[3].dispatchEvent(new w.MouseEvent('click',{bubbles:true}));

@@ -897,7 +897,12 @@ def realign_part(folder: str, opts: dict, log) -> dict:
         raise ValueError(tr("the neighbouring lines leave no room to work in",
                             "между соседними строками не осталось места"))
 
-    text = "\n".join((ln.get("text") or "") for ln in lines[a:b + 1])
+    # A line that shows a sign instead of its words goes back to the parser in
+    # the form the lyrics file writes it in, so that the model is given words
+    # again and the sign returns to the stage afterwards.
+    text = "\n".join((f"{ln['sung']} | {ln.get('text') or ''}" if ln.get("sung")
+                      else (ln.get("text") or ""))
+                     for ln in lines[a:b + 1])
     piece = L.parse(text)
     if len(piece.lines) != b - a + 1:
         raise ValueError(tr("the chosen lines could not be read back as text",

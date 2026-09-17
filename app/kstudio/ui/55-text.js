@@ -21,6 +21,17 @@ function retext(i, text){
   // out anew threw away exactly the rhythm the person had already set. Only
   // the changed stretch is laid out, in the gap the change occupies.
   const old = ln.words;
+  // As many words as before, so each new one takes the time of the one it
+  // stands for. A line rewritten whole — signs put where the words are sung,
+  // or a misheard line typed out again — keeps the times the model measured
+  // instead of an even spread across the line.
+  if (parts.length === old.length){
+    ln.words = parts.map((w, k) => ({...old[k], w, s: syllables(w)}));
+    const last = ln.words[ln.words.length - 1];
+    ln.start = ln.words[0].t;
+    ln.end = Math.max(last.t + (last.d || 0), ln.start + 0.2);
+    return true;
+  }
   const oldN = old.map(w => normTok(w.w)), newN = parts.map(normTok);
   let pre = 0;
   while (pre < old.length && pre < parts.length

@@ -298,6 +298,61 @@ def main():
           [l.text for l in lrc.lines] == ["Строка", "Другая"],
           str([l.text for l in lrc.lines]))
 
+    print("\nA line that sings one thing and shows another")
+    # “Натуральные числа | N”: the model can only be given words, because only
+    # words can be found in a recording — the sign is what the stage shows. A
+    # song written in signs used to be impossible: the words matched nothing
+    # the model heard, and the timing fell back to a blanket spread.
+    two = _parse("Натуральные числа... | N\nЦелые числа | Z\n"
+                 "Обычная строка без знака\n(подпевка тут) | ±\n"
+                 "Строка на два слова | два знака\n"
+                 "Два слова | плюс минус\n"
+                 "Пустая правая сторона |\n")
+    check("the model is given the words, not the sign",
+          [w.text for w in two.lines[0].words] == ["Натуральные", "числа..."],
+          str([w.text for w in two.lines[0].words]))
+    check("and the sign waits beside them",
+          [w.text for w in two.lines[0].shown_words] == ["N"],
+          str([w.text for w in two.lines[0].shown_words]))
+    check("a line with no bar is left alone",
+          two.lines[2].text == "Обычная строка без знака" and not two.lines[2].shown_words)
+    check("brackets are read off the sung side", two.lines[3].backing)
+    check("a bar with nothing after it is not a division",
+          two.lines[6].shown_text is None and "|" in two.lines[6].text,
+          two.lines[6].text)
+    # the aligner has spoken: every word has its time
+    t = 0.0
+    for ln in two.lines:
+        for w in ln.words:
+            w.start, w.end, w.prob = t, t + 0.4, 0.9
+            t += 0.5
+        ln.start, ln.end = ln.words[0].start, ln.words[-1].end
+    sung_before = [[(w.start, w.end) for w in ln.words] for ln in two.lines]
+    swapped = A.show_instead(two)
+    check("every line that had a sign took it", swapped == 5, swapped)
+    check("the stage shows the sign", two.lines[0].text == "N"
+          and [w.text for w in two.lines[0].words] == ["N"],
+          two.lines[0].text)
+    check("one sign stands for the whole line it replaces",
+          abs(two.lines[0].words[0].start - sung_before[0][0][0]) < 1e-9
+          and abs(two.lines[0].words[-1].end - sung_before[0][-1][1]) < 1e-9,
+          f"{two.lines[0].words[0].start}–{two.lines[0].words[-1].end}")
+    check("as many signs as words means each takes the time of its own word",
+          [(w.start, w.end) for w in two.lines[5].words] == sung_before[5],
+          str([(w.start, w.end) for w in two.lines[5].words]))
+    check("fewer signs than words are laid out inside the line",
+          len(two.lines[4].words) == 2
+          and two.lines[4].words[0].start >= two.lines[4].start - 1e-9
+          and two.lines[4].words[-1].end <= two.lines[4].end + 1e-9,
+          str([(w.text, round(w.start, 2)) for w in two.lines[4].words]))
+    check("a line with no sign is untouched by the swap",
+          [w.text for w in two.lines[2].words] == ["Обычная", "строка", "без", "знака"])
+    check("what was sung is remembered, so a few lines can be timed again",
+          two.lines[0].to_json().get("sung") == "Натуральные числа...",
+          str(two.lines[0].to_json().get("sung")))
+    check("and a line that shows what it sings keeps no such note",
+          "sung" not in two.lines[2].to_json())
+
     print("\nExtracting the voice against a foreign master")
     _voc_checks()
 

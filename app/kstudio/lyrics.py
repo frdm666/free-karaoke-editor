@@ -57,6 +57,14 @@ TRAIL_RE = re.compile(r"^(.*\S)\s+(\([^()]{1,60}\))$")
 
 REPEAT_RE = re.compile(r"^(.*?)\s*[\(\[]?\s*[x×хХ]\s*(\d{1,2})\s*[\)\]]?\s*$", re.I)
 
+# “Натуральные числа | N” — the left side is sung, the right side is shown.
+# A model can only be given words, because only words can be found in a
+# recording; what stands on the stage in their place is nobody's business but
+# the person's — a sign, a number, a drawing made of punctuation. The bar is
+# not a letter of any alphabet and does not turn up in lyrics, which is why it
+# is the one that divides them.
+SHOWN_SEP = "|"
+
 
 def _split_repeat(text: str):
     """“line x3” → (“line”, 3). Without a mark — (line, 1)."""
@@ -180,6 +188,14 @@ class Line:
     # split off the tail of the line above: a duet with it, not a line after it.
     # Not saved with the song — re-parsing the text derives it again.
     tail: bool = False
+    # “Натуральные числа | N”: the words are sung and given to the model, the
+    # sign is what the stage shows. Both live here until the times are known —
+    # the swap is made after the alignment, never before it.
+    shown_words: List["Word"] = field(default_factory=list)
+    shown_text: Optional[str] = None
+    # …and once the swap is made, what was sung is remembered, so that timing a
+    # few lines again can give the model words rather than signs.
+    sung_text: Optional[str] = None
 
     @property
     def syllables(self) -> int:
@@ -211,6 +227,8 @@ class Line:
         }
         if self.sure is not None:
             out["sure"] = round(self.sure, 3)
+        if self.sung_text and self.sung_text != self.text:
+            out["sung"] = self.sung_text
         return out
 
 
@@ -321,6 +339,15 @@ def parse(raw: str) -> Lyrics:
                     lyr.skips.append((start, finish))
                 continue
 
+        # What is sung and what is shown, if the line says they differ. Split
+        # before everything else, so that brackets, voices and repeats are read
+        # off the words as usual — the sign stands aside and waits.
+        shown_src = None
+        if SHOWN_SEP in line:
+            left, _, right = line.rpartition(SHOWN_SEP)
+            if left.strip() and right.strip():
+                line, shown_src = left.strip(), right.strip()
+
         backing = False
         voice = None
         if start is None:
@@ -394,7 +421,10 @@ def parse(raw: str) -> Lyrics:
                                   section=pending_section if k == 0 else None,
                                   start=start, end=finish,
                                   held=finish is not None, backing=backing,
-                                  voice=voice or (2 if backing else cur_voice)))
+                                  voice=voice or (2 if backing else cur_voice),
+                                  shown_words=_split_words(shown_src) if shown_src else [],
+                                  shown_text=(re.sub("[" + SYL_MARK + "]", "", shown_src)
+                                              if shown_src else None)))
             if trail:
                 lyr.lines.append(Line(text=trail_shown, words=_split_words(trail),
                                       section=None, start=None, backing=True,

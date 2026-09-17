@@ -7,6 +7,30 @@ commits themselves are one click away in the history.
 
 ---
 
+## 4.60.0
+
+**A line can sing one thing and show another.** The words go on the left of a
+bar, the sign on the right — `Натуральные числа... | N` — and the model is
+given the words, because only words can be found in a recording, while the
+page and the video show the sign. A song written in mathematical symbols was
+impossible before: signs in the lyrics file match nothing the model hears, the
+timing fell back to a blanket spread, and the message blamed an incompatible
+stable-ts, which was never true.
+
+Where both sides hold the same number of words, each shown word takes the time
+of the sung word it stands for and the highlight follows the singing exactly;
+where they differ, the shown side is laid out across the line by syllable. It
+lives in the lyrics file, so a rebuild, a re-timing and a packing all keep it —
+and timing a few lines again hands the model the words once more, because the
+song remembers what each line sings.
+
+Two things came with it. A line rewritten whole in the editor — every word
+replaced — now keeps the times measured word by word instead of being spread
+evenly across its span. And the message for a text that meets nothing in the
+recording says so, and names the likely reasons in the order they happen.
+
+---
+
 ## 4.59.0
 
 **The page's colours stay on the page.** The background and text colours a

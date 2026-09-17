@@ -494,10 +494,14 @@ def align_whisper(lyrics: Lyrics, audio_path: str, duration: float,
     # silently turns the timing into an evenly spread blanket.
     if matched < 0.4:
         raise RuntimeError(tr(
-            f"the words could not be matched to Whisper's output "
-            f"({matched:.0%} matched) — looks like an incompatible stable-ts version",
-            f"слова не удалось сопоставить с выводом Whisper (совпало {matched:.0%}) — "
-            f"похоже на несовместимую версию stable-ts"))
+            f"the text does not meet what is heard here ({matched:.0%} of the "
+            f"words matched). If the lines carry signs instead of words, write "
+            f"them as “sung | shown”; if they do not, the file may hold another "
+            f"song — or stable-ts is of a version this cannot read",
+            f"текст не сходится с тем, что слышно (совпало {matched:.0%} слов). "
+            f"Если в строках знаки вместо слов, пишите их как «поётся | "
+            f"показывается»; если нет — в файле, возможно, другая песня, либо "
+            f"stable-ts несовместимой версии"))
 
     # Low confidence, on the other hand, hints the text does not fit the audio
     if probs:
@@ -1630,11 +1634,61 @@ def align_anchored(lyrics: Lyrics, audio_path: str, duration: float,
     return lyrics
 
 
+def show_instead(lyrics: Lyrics) -> int:
+    """Put on the stage what a line says it shows, instead of what it sings.
+
+    “Натуральные числа | N”: the model was given the words, because a sign
+    cannot be found in a recording; the stage gets the sign. Where the two
+    sides hold the same number of words, each shown word takes the time of the
+    sung word it stands for, and the sweep follows the singing exactly. Where
+    they differ — one sign for a whole line — the shown words are laid out
+    across the line by syllable, as any line with no measurement of its own is.
+    """
+    n = 0
+    for ln in lyrics.lines:
+        if not ln.shown_words:
+            continue
+        fresh = ln.shown_words
+        if len(fresh) == len(ln.words):
+            for new, old in zip(fresh, ln.words):
+                new.start, new.end = old.start, old.end
+                new.prob, new.note = old.prob, old.note
+        else:
+            lo = ln.start if ln.start is not None else (ln.words[0].start or 0.0)
+            hi = ln.end if ln.end is not None else (ln.words[-1].end or lo)
+            _spread(fresh, lo, hi)
+        ln.sung_text = ln.text
+        ln.text = ln.shown_text or ln.text
+        ln.words = fresh
+        ln.shown_words = []
+        n += 1
+    return n
+
+
 def align(lyrics: Lyrics, audio_path: str, duration: float, engine: str = "auto",
           model_name: str = "medium", language: str = "ru",
           device: Optional[str] = None, log: Log = _noop,
           isolated: bool = False, skip=None) -> tuple:
-    """Returns (lyrics, engine_used)."""
+    """Returns (lyrics, engine_used).
+
+    Every road to a timing passes through here, and so does the swap of the
+    sung words for the shown ones: it is made after the times are known and
+    never before, because the model must be given words whatever the stage
+    ends up showing.
+    """
+    out, label = _by_engine(lyrics, audio_path, duration, engine, model_name,
+                            language, device, log, isolated, skip)
+    swapped = show_instead(out)
+    if swapped:
+        log(tr(f"  lines showing a sign instead of their words: {swapped}",
+               f"  строк показывают знак вместо своих слов: {swapped}"))
+    return out, label
+
+
+def _by_engine(lyrics: Lyrics, audio_path: str, duration: float, engine: str = "auto",
+               model_name: str = "medium", language: str = "ru",
+               device: Optional[str] = None, log: Log = _noop,
+               isolated: bool = False, skip=None) -> tuple:
     timed = sum(1 for ln in lyrics.lines if ln.start is not None)
     if lyrics.has_manual_times and timed == len(lyrics.lines):
         log(tr("The text already has [mm:ss.dd] timings — skipping alignment.",

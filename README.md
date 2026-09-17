@@ -327,6 +327,32 @@ Cyrillic х too), brackets are allowed — `(x4)` — and the number can be 2 to
 A section heading is not repeated with the line, and if the file has manual LRC
 timings, repeats are left alone: every line there has its own time.
 
+## Singing one thing, showing another
+
+A line may put something else on the stage than what is sung. The words go on
+the left of a bar, the sign on the right:
+
+```
+Натуральные числа... | N
+Целые числа...       | Z
+Рациональные числа   | Q
+```
+
+The model is given the words, because only words can be found in a recording;
+the page and the video show the sign. A line with no bar is a line as before,
+and both sides can hold anything — a symbol, a number, a drawing made of
+punctuation.
+
+Where the two sides have the same number of words, each shown word takes the
+time of the sung word it stands for, and the highlight follows the singing
+exactly. Where they differ — one sign for a whole line — the shown side is
+laid out across the line by syllable.
+
+This lives in the lyrics file, so it survives a rebuild, a re-timing and a
+packing. Writing the signs straight into the file instead would not work at
+all: nothing in the recording matches them, and the timing would fall back to
+a blanket spread.
+
 ## Where there are no words
 
 A vocalise, a scream with nothing to write down, a hummed intro — all of that is
